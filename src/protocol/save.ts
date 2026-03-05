@@ -1,5 +1,6 @@
 import {
   DirectoryHandles,
+  EconetAddress,
   fsControlByte,
   fsPort,
   logProgress,
@@ -12,7 +13,7 @@ import {
 import { driver, RxTransmitEvent } from '@jprayner/piconet-nodejs';
 
 export const save = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   fileData: Buffer,
   remoteFilename: string,
   loadAddr: number,
@@ -61,17 +62,17 @@ export const save = async (
   );
 
   const replyQueue = driver.eventQueueCreate(
-    responseMatcher(serverStation, 0, fsControlByte, [replyPort]),
+    responseMatcher(serverStation.station, serverStation.network, fsControlByte, [replyPort]),
   );
 
   const ackQueue = driver.eventQueueCreate(
-    responseMatcher(serverStation, 0, fsControlByte, [ackPort]),
+    responseMatcher(serverStation.station, serverStation.network, fsControlByte, [ackPort]),
   );
 
   try {
     const txResult = await driver.transmit(
-      serverStation,
-      0,
+      serverStation.station,
+      serverStation.network,
       fsControlByte,
       fsPort,
       msg,
@@ -79,7 +80,7 @@ export const save = async (
 
     if (!txResult.success) {
       throw new Error(
-        `Failed to send SAVE command to station ${serverStation}`,
+        `Failed to send SAVE command to station ${serverStation.network}.${serverStation.station}`,
       );
     }
 
@@ -92,7 +93,7 @@ export const save = async (
 
     if (serverReply.data.length < 3) {
       throw new Error(
-        `Malformed response in SAVE from station ${serverStation}: success but not enough data`,
+        `Malformed response in SAVE from station ${serverStation.network}.${serverStation.station}: success but not enough data`,
       );
     }
 
@@ -108,8 +109,8 @@ export const save = async (
       let lastError = '';
       for (let retry = 0; retry < 3 && !sendSuccess; retry++) {
         const dataTxResult = await driver.transmit(
-          serverStation,
-          0,
+          serverStation.station,
+          serverStation.network,
           fsControlByte,
           dataPort,
           dataToSend,
@@ -123,7 +124,7 @@ export const save = async (
 
       if (!sendSuccess) {
         throw new Error(
-          `Failed to send SAVE data to station ${serverStation}: ${lastError}}`,
+          `Failed to send SAVE data to station ${serverStation.network}.${serverStation.station}: ${lastError}}`,
         );
       }
 
@@ -153,18 +154,19 @@ export const save = async (
 
 const waitForSaveStatus = async (
   queue: driver.EventQueue,
-  serverStation: number,
+  serverStation: EconetAddress,
 ) => {
   const rxTransmitEvent = await driver.eventQueueWait(
     queue,
     2000,
     'save status',
   );
+  const stationLabel = `${serverStation.network}.${serverStation.station}`;
   if (!(rxTransmitEvent instanceof RxTransmitEvent)) {
-    throw new Error(`Unexpected response from station ${serverStation}`);
+    throw new Error(`Unexpected response from station ${stationLabel}`);
   }
   if (rxTransmitEvent.dataFrame.length < 9) {
-    throw new Error(`Malformed response from station ${serverStation}`);
+    throw new Error(`Malformed response from station ${stationLabel}`);
   }
 
   return {

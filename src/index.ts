@@ -2,9 +2,9 @@
 import { driver } from '@jprayner/piconet-nodejs';
 import { Command } from '@commander-js/extra-typings';
 
-import { ConfigOptions, initConnection } from './common';
+import { ConfigOptions, EconetAddress, initConnection, parseEconetAddress } from './common';
 import { PKG_VERSION } from './version';
-import { getLocalStationNum, getServerStationNum } from './config';
+import { getLocalStationNum, getServerNetworkNum, getServerStationNum } from './config';
 import { commandIAm } from './command/iAm';
 import { commandSetFileserver } from './command/setFileserver';
 import { commandGetStatus } from './command/getStatus';
@@ -26,6 +26,9 @@ import { commandNewUser } from './command/newUser';
 import { commandRemUser } from './command/remUser';
 import { commandPass } from './command/pass';
 import { commandPriv } from './command/priv';
+import { commandInteractive } from './command/interactive';
+import { commandFslist } from './command/fslist';
+import { readHiddenPassword } from './command/readPassword';
 
 type CliOptions = {
   debug?: true | undefined;
@@ -41,12 +44,22 @@ const program = new Command()
   .option('-d, --debug', 'enable debug output')
   .option('-n, --devicename <string>', 'specify device name/path')
   .option('-s, --station <number>', 'specify local Econet station number')
-  .option('-fs, --fileserver <number>', 'specify fileserver station number');
+  .option('-fs, --fileserver <address>', 'specify fileserver address (e.g. 254 or 1.254)')
+  .option('-i, --interactive', 'start an interactive shell session with the fileserver')
+  .addHelpText('after', ' ')
+  .action(async () => {
+    if (program.opts().interactive) {
+      const config = await resolveConfig(program.opts());
+      await connectionWrapper(commandInteractive, config, config.serverStation);
+    } else {
+      program.help();
+    }
+  });
 
 program
   .command('set-fs')
   .description('set fileserver')
-  .argument('<station>', 'station number')
+  .argument('[net.]<station>', 'station number')
   .action(async station => {
     await errorHandlingWrapper(commandSetFileserver, station);
   });
@@ -79,15 +92,16 @@ program
   .command('i-am')
   .description('login to fileserver like a "*I AM" command')
   .argument('<username>', 'username')
-  .argument('[password]', 'password')
+  .argument('[password]', 'password (use ":" to be prompted securely)')
   .action(async (username, password) => {
     const config = await resolveConfig(program.opts());
+    const actualPassword = password === ':' ? await readHiddenPassword('Password: ') : (password || '');
     await connectionWrapper(
       commandIAm,
       config,
       config.serverStation,
       username,
-      password || '',
+      actualPassword,
     );
   });
 
@@ -96,7 +110,7 @@ program
   .description(
     'send notification message to a station like a "*NOTIFY" command',
   )
-  .argument('<station>', 'station number')
+  .argument('[net.]<station>', 'station number')
   .argument('<message>', 'message')
   .action(async (station, message) => {
     const config = await resolveConfig(program.opts());
@@ -118,6 +132,14 @@ program
   .action(async () => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandMonitor, config);
+  });
+
+program
+  .command('fslist')
+  .description('list file servers on the network')
+  .action(async () => {
+    const config = await resolveConfig(program.opts());
+    await connectionWrapper(commandFslist, config);
   });
 
 program
@@ -321,8 +343,8 @@ program
     );
   });
 
-const main = () => {
-  program.parse(process.argv);
+const main = async () => {
+  await program.parseAsync(process.argv);
 };
 
 const resolveConfig = async (cliOptions: CliOptions) => {
@@ -332,10 +354,10 @@ const resolveConfig = async (cliOptions: CliOptions) => {
       : undefined;
 
   const serverStationOption = cliOptions.fileserver;
-  const serverStation =
+  const serverStation: EconetAddress =
     typeof serverStationOption === 'string'
-      ? parseInt(serverStationOption)
-      : await getServerStationNum();
+      ? parseEconetAddress(serverStationOption)
+      : { network: await getServerNetworkNum(), station: await getServerStationNum() };
 
   const stationOption = cliOptions.station;
   const localStation =

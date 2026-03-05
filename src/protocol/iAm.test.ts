@@ -18,9 +18,9 @@ describe('iAm protocol handler', () => {
       resultCode: 0,
       data: Buffer.from([0, 1, 2, 3]),
     });
-    const result = await iAm(254, 'JPR93', 'MYPASS');
+    const result = await iAm({ network: 0, station: 254 }, 'JPR93', 'MYPASS');
     expect(executeCliCommandMock).toHaveBeenCalledWith(
-      254,
+      { network: 0, station: 254 },
       'I AM JPR93 MYPASS',
       {
         userRoot: 0,
@@ -46,8 +46,8 @@ describe('iAm protocol handler', () => {
       resultCode: 0,
       data: Buffer.from([0, 1, 2, 3]),
     });
-    const result = await iAm(254, 'JPR93');
-    expect(executeCliCommandMock).toHaveBeenCalledWith(254, 'I AM JPR93', {
+    const result = await iAm({ network: 0, station: 254 }, 'JPR93');
+    expect(executeCliCommandMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'I AM JPR93', {
       userRoot: 0,
       current: 0,
       library: 0,
@@ -70,8 +70,8 @@ describe('iAm protocol handler', () => {
       resultCode: 0,
       data: Buffer.from([0]),
     });
-    await expect(iAm(254, 'JPR93', 'MYPASS')).rejects.toThrowError(
-      'Malformed response from station 254: success but not enough data',
+    await expect(iAm({ network: 0, station: 254 }, 'JPR93', 'MYPASS')).rejects.toThrowError(
+      'Malformed response from station 0.254: success but not enough data',
     );
   });
 });

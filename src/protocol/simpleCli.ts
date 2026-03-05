@@ -1,22 +1,22 @@
-import { DirectoryHandles, executeCliCommand } from '../common';
+import { DirectoryHandles, EconetAddress, executeCliCommand } from '../common';
 
-export const bye = async (serverStation: number, handles: DirectoryHandles) =>
+export const bye = async (serverStation: EconetAddress, handles: DirectoryHandles) =>
   executeCliCommand(serverStation, 'BYE', handles);
 
 export const cdir = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   dirName: string,
   handles: DirectoryHandles,
 ) => executeCliCommand(serverStation, `CDIR ${dirName}`, handles);
 
 export const deleteFile = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   filePath: string,
   handles: DirectoryHandles,
 ) => executeCliCommand(serverStation, `DELETE ${filePath}`, handles);
 
 export const access = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   filePath: string,
   accessString: string,
   handles: DirectoryHandles,
@@ -28,19 +28,19 @@ export const access = async (
   );
 
 export const newUser = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   username: string,
   handles: DirectoryHandles,
 ) => executeCliCommand(serverStation, `NEWUSER ${username}`, handles);
 
 export const removeUser = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   username: string,
   handles: DirectoryHandles,
 ) => executeCliCommand(serverStation, `REMUSER ${username}`, handles);
 
 export const changePassword = (
-  serverStation: number,
+  serverStation: EconetAddress,
   oldPassword: string,
   newPassword: string,
   handles: DirectoryHandles,
@@ -54,7 +54,7 @@ export const changePassword = (
   );
 
 export const setPrivileged = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   username: string,
   level: string,
   handles: DirectoryHandles,

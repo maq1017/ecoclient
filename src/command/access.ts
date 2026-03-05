@@ -1,8 +1,9 @@
+import { EconetAddress } from '../common';
 import { getHandles } from '../config';
 import { access } from '../protocol/simpleCli';
 
 export const commandAccess = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   pathToSetAccess: string,
   accessString: string,
 ) => {

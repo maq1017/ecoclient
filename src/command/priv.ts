@@ -1,8 +1,9 @@
+import { EconetAddress } from '../common';
 import { getHandles } from '../config';
 import { setPrivileged } from '../protocol/simpleCli';
 
 export const commandPriv = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   username: string,
   level: string,
 ) => {

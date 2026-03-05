@@ -63,10 +63,10 @@ describe('commandPut', () => {
         .spyOn(fs, 'readFileSync')
         .mockImplementation(() => Buffer.from([1, 2, 3]));
 
-      await commandPut(254, 'MYFILE', false, false);
+      await commandPut({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE',
         0xffffffff,
@@ -103,10 +103,10 @@ describe('commandPut', () => {
         .spyOn(fs, 'readFileSync')
         .mockImplementation(() => Buffer.from([1, 2, 3]));
 
-      await commandPut(254, 'MYFILE,12345678,87654321', false, false);
+      await commandPut({ network: 0, station: 254 }, 'MYFILE,12345678,87654321', false, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE',
         0x12345678,
@@ -142,10 +142,10 @@ describe('commandPut', () => {
         loadAddr: 0x12345678,
         execAddr: 0x87654321,
       });
-      await commandPut(254, 'MYFILE', false, false);
+      await commandPut({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE',
         0x12345678,
@@ -177,7 +177,7 @@ describe('commandPut', () => {
       });
       promptOverwriteMock.mockResolvedValue(false);
 
-      await commandPut(254, 'MYFILE', false, false);
+      await commandPut({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(saveMock).not.toHaveBeenCalled();
     });
@@ -201,10 +201,10 @@ describe('commandPut', () => {
       });
       promptOverwriteMock.mockResolvedValue(true);
 
-      await commandPut(254, 'MYFILE', false, false);
+      await commandPut({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE',
         0xffffffff,
@@ -269,10 +269,10 @@ describe('commandPut', () => {
         .spyOn(fs, 'readFileSync')
         .mockImplementation(() => Buffer.from([1, 2, 3]));
 
-      await commandPut(254, 'MYFILE*', false, false);
+      await commandPut({ network: 0, station: 254 }, 'MYFILE*', false, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE1',
         0xffffffff,
@@ -284,7 +284,7 @@ describe('commandPut', () => {
         },
       );
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE2',
         0xffffffff,
@@ -347,10 +347,10 @@ describe('commandPut', () => {
         .spyOn(fs, 'readFileSync')
         .mockImplementation(() => Buffer.from([1, 2, 3]));
 
-      await commandPut(254, 'MY*', true, true);
+      await commandPut({ network: 0, station: 254 }, 'MY*', true, true);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYDIR.MYFILE1',
         0xffffffff,
@@ -408,10 +408,10 @@ describe('commandPut', () => {
         .spyOn(fs, 'readFileSync')
         .mockImplementation(() => Buffer.from([1, 2, 3]));
 
-      await commandPut(254, 'MYDIR', true, false);
+      await commandPut({ network: 0, station: 254 }, 'MYDIR', true, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYDIR.MYFILE1',
         0xffffffff,
@@ -423,7 +423,7 @@ describe('commandPut', () => {
         },
       );
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYDIR.MYFILE2',
         0xffffffff,
@@ -492,10 +492,10 @@ describe('commandPut', () => {
         new DfsDiskSide('archive.ssd', 0),
       );
 
-      await commandPut(254, 'archive.ssd', false, false);
+      await commandPut({ network: 0, station: 254 }, 'archive.ssd', false, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE1',
         0xffffffff,
@@ -507,7 +507,7 @@ describe('commandPut', () => {
         },
       );
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         'MYFILE2',
         0xffffffff,
@@ -577,7 +577,7 @@ describe('commandPut', () => {
       mockLstat(['archive.dsd', 'MYFILE1', 'MYFILE2']);
 
       readAccessObjectInfoMock.mockImplementation(
-        (serverStation: number, remotePath: string) => {
+        (serverStation, remotePath: string) => {
           if (remotePath.toString() === '0' || remotePath.toString() === '1') {
             return Promise.resolve({
               fileExists: true,
@@ -601,10 +601,10 @@ describe('commandPut', () => {
         new DfsDiskSide('archive2', 0),
       ]);
 
-      await commandPut(254, 'archive.dsd', true, false);
+      await commandPut({ network: 0, station: 254 }, 'archive.dsd', true, false);
 
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         '0.MYFILE1',
         0xffffffff,
@@ -616,7 +616,7 @@ describe('commandPut', () => {
         },
       );
       expect(saveMock).toHaveBeenCalledWith(
-        254,
+        { network: 0, station: 254 },
         Buffer.from([1, 2, 3]),
         '1.MYFILE2',
         0xffffffff,

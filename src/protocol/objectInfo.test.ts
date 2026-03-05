@@ -30,7 +30,7 @@ describe('objectInfo protocol handler', () => {
         );
 
       waitForReceiveTxEventMock.mockImplementation(
-        async (queue: driver.EventQueue, serverStation: number) => {
+        async (queue: driver.EventQueue, serverStation) => {
           const header = Buffer.from([0, 0, 0]);
           const dirName10Chars = Buffer.from('SOMEDIR   ');
           const trailer = Buffer.from([
@@ -47,7 +47,7 @@ describe('objectInfo protocol handler', () => {
         },
       );
 
-      const result = await readDirAccessObjectInfo(254, '$', {
+      const result = await readDirAccessObjectInfo({ network: 0, station: 254 }, '$', {
         userRoot: 0,
         current: 1,
         library: 2,
@@ -78,13 +78,13 @@ describe('objectInfo protocol handler', () => {
         );
 
       await expect(
-        readDirAccessObjectInfo(254, '$', {
+        readDirAccessObjectInfo({ network: 0, station: 254 }, '$', {
           userRoot: 0,
           current: 1,
           library: 2,
         }),
       ).rejects.toThrowError(
-        'Failed to send object info command (0x12) to station 254: Something bad happened',
+        'Failed to send object info command (0x12) to station 0.254: Something bad happened',
       );
     });
 
@@ -105,7 +105,7 @@ describe('objectInfo protocol handler', () => {
         );
 
       waitForReceiveTxEventMock.mockImplementation(
-        async (queue: driver.EventQueue, serverStation: number) => {
+        async (queue: driver.EventQueue, serverStation) => {
           return Promise.resolve({
             controlByte: 0x80,
             port: 0x90,
@@ -117,13 +117,13 @@ describe('objectInfo protocol handler', () => {
       );
 
       await expect(
-        readDirAccessObjectInfo(254, '$', {
+        readDirAccessObjectInfo({ network: 0, station: 254 }, '$', {
           userRoot: 0,
           current: 1,
           library: 2,
         }),
       ).rejects.toThrowError(
-        'Malformed response from station 254: success but not enough data',
+        'Malformed response from station 0.254: success but not enough data',
       );
     });
   });
@@ -135,7 +135,7 @@ describe('objectInfo protocol handler', () => {
         .mockResolvedValue(new TxResultEvent(true, 'OK'));
 
       waitForReceiveTxEventMock.mockImplementation(
-        async (queue: driver.EventQueue, serverStation: number) => {
+        async (queue: driver.EventQueue, serverStation) => {
           const data = Buffer.from([
             0x01, // file exists
             0x08 | 0x04 | 0x01, // WR/R
@@ -151,7 +151,7 @@ describe('objectInfo protocol handler', () => {
         },
       );
 
-      const result = await readAccessObjectInfo(254, 'MYFILE', {
+      const result = await readAccessObjectInfo({ network: 0, station: 254 }, 'MYFILE', {
         userRoot: 0,
         current: 1,
         library: 2,

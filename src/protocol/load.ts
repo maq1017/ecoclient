@@ -5,13 +5,14 @@ import {
   stripCRs,
   waitForReceiveTxEvent,
   DirectoryHandles,
+  EconetAddress,
   logProgress,
   responseMatcher,
 } from '../common';
 import { driver, RxTransmitEvent } from '@jprayner/piconet-nodejs';
 
 export const load = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   filename: string,
   handles: DirectoryHandles,
 ) => {
@@ -30,27 +31,27 @@ export const load = async (
   );
 
   const queue = driver.eventQueueCreate(
-    responseMatcher(serverStation, 0, fsControlByte, [dataPort, replyPort]),
+    responseMatcher(serverStation.station, serverStation.network, fsControlByte, [dataPort, replyPort]),
   );
 
   let serverReply;
   try {
     const txResult = await driver.transmit(
-      serverStation,
-      0,
+      serverStation.station,
+      serverStation.network,
       fsControlByte,
       fsPort,
       msg,
     );
     if (!txResult.success) {
       throw new Error(
-        `Failed to send LOAD command to station ${serverStation}`,
+        `Failed to send LOAD command to station ${serverStation.network}.${serverStation.station}`,
       );
     }
 
     serverReply = await waitForReceiveTxEvent(
       queue,
-      2000,
+      serverStation,
       'waiting for LOAD response',
     );
 
@@ -61,7 +62,7 @@ export const load = async (
 
     if (serverReply.data.length < 14) {
       throw new Error(
-        `Malformed response in LOAD from station ${serverStation}: success but not enough data (${serverReply.data.length} bytes received)`,
+        `Malformed response in LOAD from station ${serverStation.network}.${serverStation.station}: success but not enough data (${serverReply.data.length} bytes received)`,
       );
     }
 
@@ -92,14 +93,14 @@ export const load = async (
         !(rxTransmitEvent instanceof RxTransmitEvent) ||
         rxTransmitEvent.scoutFrame.length < 6
       ) {
-        throw new Error(`Unexpected response from station ${serverStation}`);
+        throw new Error(`Unexpected response from station ${serverStation.network}.${serverStation.station}`);
       }
 
       const port = rxTransmitEvent.scoutFrame[5];
       switch (port) {
         case replyPort: {
           if (rxTransmitEvent.dataFrame.length < 6) {
-            throw new Error(`Malformed response from station ${serverStation}`);
+            throw new Error(`Malformed response from station ${serverStation.network}.${serverStation.station}`);
           }
 
           const resultCode = rxTransmitEvent.dataFrame[5];
@@ -122,7 +123,7 @@ export const load = async (
         case dataPort:
           if (rxTransmitEvent.dataFrame.length < 4) {
             throw new Error(
-              `Malformed data frame from station ${serverStation}`,
+              `Malformed data frame from station ${serverStation.network}.${serverStation.station}`,
             );
           }
           data = Buffer.concat([data, rxTransmitEvent.dataFrame.slice(4)]);

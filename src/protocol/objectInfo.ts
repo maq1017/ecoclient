@@ -1,6 +1,7 @@
 import { driver } from '@jprayner/piconet-nodejs';
 import {
   DirectoryHandles,
+  EconetAddress,
   fsControlByte,
   fsPort,
   responseMatcher,
@@ -9,7 +10,7 @@ import {
 } from '../common';
 
 export const readDirAccessObjectInfo = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   dirPath: string,
   handles: DirectoryHandles,
 ) => {
@@ -29,7 +30,7 @@ export const readDirAccessObjectInfo = async (
   const objectInfoTrailer = Buffer.from(`${dirPath}\r`);
 
   const queue = driver.eventQueueCreate(
-    responseMatcher(serverStation, 0, undefined, [replyPort]),
+    responseMatcher(serverStation.station, serverStation.network, undefined, [replyPort]),
   );
 
   const msg = standardTxMessage(
@@ -40,8 +41,8 @@ export const readDirAccessObjectInfo = async (
   );
 
   const txResult = await driver.transmit(
-    serverStation,
-    0,
+    serverStation.station,
+    serverStation.network,
     fsControlByte,
     fsPort,
     msg,
@@ -49,15 +50,15 @@ export const readDirAccessObjectInfo = async (
 
   if (!txResult.success) {
     throw new Error(
-      `Failed to send object info command (0x12) to station ${serverStation}: ${txResult.description}`,
+      `Failed to send object info command (0x12) to station ${serverStation.network}.${serverStation.station}: ${txResult.description}`,
     );
   }
 
-  const serverReply = await waitForReceiveTxEvent(queue, 2000);
+  const serverReply = await waitForReceiveTxEvent(queue, serverStation);
 
   if (serverReply.data.length < 15) {
     throw new Error(
-      `Malformed response from station ${serverStation}: success but not enough data`,
+      `Malformed response from station ${serverStation.network}.${serverStation.station}: success but not enough data`,
     );
   }
 
@@ -73,7 +74,7 @@ export const readDirAccessObjectInfo = async (
 };
 
 export const readAccessObjectInfo = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   path: string,
   handles: DirectoryHandles,
 ) => {
@@ -93,7 +94,7 @@ export const readAccessObjectInfo = async (
   const objectInfoTrailer = Buffer.from(`${path}\r`);
 
   const queue = driver.eventQueueCreate(
-    responseMatcher(serverStation, 0, undefined, [replyPort]),
+    responseMatcher(serverStation.station, serverStation.network, undefined, [replyPort]),
   );
 
   const msg = standardTxMessage(
@@ -104,8 +105,8 @@ export const readAccessObjectInfo = async (
   );
 
   const txResult = await driver.transmit(
-    serverStation,
-    0,
+    serverStation.station,
+    serverStation.network,
     fsControlByte,
     fsPort,
     msg,
@@ -113,15 +114,15 @@ export const readAccessObjectInfo = async (
 
   if (!txResult.success) {
     throw new Error(
-      `Failed to send object info command (0x12) to station ${serverStation}: ${txResult.description}`,
+      `Failed to send object info command (0x12) to station ${serverStation.network}.${serverStation.station}: ${txResult.description}`,
     );
   }
 
-  const serverReply = await waitForReceiveTxEvent(queue, 2000);
+  const serverReply = await waitForReceiveTxEvent(queue, serverStation);
 
   if (serverReply.data.length === 0) {
     throw new Error(
-      `Malformed response from station ${serverStation}: success but not enough data (1)`,
+      `Malformed response from station ${serverStation.network}.${serverStation.station}: success but not enough data (1)`,
     );
   }
 
@@ -136,7 +137,7 @@ export const readAccessObjectInfo = async (
 
   if (serverReply.data.length < 3) {
     throw new Error(
-      `Malformed response from station ${serverStation}: success but not enough data (2)`,
+      `Malformed response from station ${serverStation.network}.${serverStation.station}: success but not enough data (2)`,
     );
   }
 

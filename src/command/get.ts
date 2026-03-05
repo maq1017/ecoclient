@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, lstatSync, rmSync } from 'fs';
 
-import { saveFileInfo } from '../common';
+import { EconetAddress, saveFileInfo } from '../common';
 import { getHandles, getMetadataType } from '../config';
 import { load } from '../protocol/load';
 import { readAccessObjectInfo } from '../protocol/objectInfo';
@@ -19,7 +19,7 @@ import {
 const MAX_RETRIES = 3;
 
 export const commandGet = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   filename: string,
   recurse: boolean,
   force: boolean,
@@ -82,7 +82,7 @@ export const commandGet = async (
 };
 
 const getMultipleFiles = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   dirPath: string,
   wildcardPattern: string,
   recurse: boolean,
@@ -142,7 +142,7 @@ const getMultipleFiles = async (
 };
 
 const getSingleFileWithRetries = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   srcFilename: string,
   overwriteTracker: FileOverwriteTracker,
 ) => {
@@ -163,7 +163,7 @@ const getSingleFileWithRetries = async (
 };
 
 const getSingleFile = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   srcFilename: string,
   overwriteTracker: FileOverwriteTracker,
 ) => {

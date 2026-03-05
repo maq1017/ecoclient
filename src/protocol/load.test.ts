@@ -94,7 +94,7 @@ describe('load protocol handler', () => {
         );
       });
 
-    const result = await load(254, 'FNAME', {
+    const result = await load({ network: 0, station: 254 }, 'FNAME', {
       userRoot: 0,
       current: 1,
       library: 2,
@@ -127,8 +127,8 @@ describe('load protocol handler', () => {
       );
 
     await expect(
-      load(254, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
-    ).rejects.toThrowError('Failed to send LOAD command to station 254');
+      load({ network: 0, station: 254 }, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
+    ).rejects.toThrowError('Failed to send LOAD command to station 0.254');
   });
 
   it('should handle truncated server response correctly', async () => {
@@ -136,7 +136,7 @@ describe('load protocol handler', () => {
     setupTransmitMock();
 
     waitForReceiveTxEventMock.mockImplementation(
-      async (queue: driver.EventQueue, serverStation: number) => {
+      async (queue: driver.EventQueue, serverStation) => {
         return Promise.resolve({
           controlByte: 0x80,
           port: dataPort,
@@ -148,9 +148,9 @@ describe('load protocol handler', () => {
     );
 
     await expect(
-      load(254, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
+      load({ network: 0, station: 254 }, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
     ).rejects.toThrowError(
-      'Malformed response in LOAD from station 254: success but not enough data',
+      'Malformed response in LOAD from station 0.254: success but not enough data',
     );
   });
 
@@ -160,7 +160,7 @@ describe('load protocol handler', () => {
     setupTransmitMock();
 
     waitForReceiveTxEventMock.mockImplementation(
-      async (queue: driver.EventQueue, serverStation: number) => {
+      async (queue: driver.EventQueue, serverStation) => {
         return Promise.resolve({
           controlByte: 0x80,
           port: dataPort,
@@ -172,7 +172,7 @@ describe('load protocol handler', () => {
     );
 
     await expect(
-      load(254, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
+      load({ network: 0, station: 254 }, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
     ).rejects.toThrowError('Something bad happened');
   });
 
@@ -206,7 +206,7 @@ describe('load protocol handler', () => {
       });
 
     await expect(
-      load(254, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
+      load({ network: 0, station: 254 }, 'FNAME', { userRoot: 0, current: 1, library: 2 }),
     ).rejects.toThrowError('Load failed: Oh dear, oh dear');
   });
 });
@@ -232,7 +232,7 @@ const setupWaitForReceiveTxEventMock = () => {
   waitForReceiveTxEventMock.mockImplementation(
     async (
       queue: driver.EventQueue,
-      timeoutMs: number,
+      serverStation,
       description?: string,
     ) => {
       const header = Buffer.alloc(14);

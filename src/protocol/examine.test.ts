@@ -27,7 +27,7 @@ describe('examine protocol handler', () => {
       .mockResolvedValueOnce(dummyExamineCommandSuccessResponse())
       .mockResolvedValueOnce(dummyExamineCommandCompleteResponse());
 
-    const result = await examineDir(254, 'D1', {
+    const result = await examineDir({ network: 0, station: 254 }, 'D1', {
       userRoot: 1, // Unusual handling for SAVE: ack port lives here
       current: 2,
       library: 3,

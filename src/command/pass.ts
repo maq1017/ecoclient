@@ -1,8 +1,9 @@
+import { EconetAddress } from '../common';
 import { getHandles } from '../config';
 import { changePassword } from '../protocol/simpleCli';
 
 export const commandPass = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   oldPassword: string,
   newPassword: string,
 ) => {
