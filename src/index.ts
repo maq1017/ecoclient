@@ -28,7 +28,7 @@ import { commandPass } from './command/pass';
 import { commandPriv } from './command/priv';
 import { commandInteractive } from './command/interactive';
 import { commandFslist } from './command/fslist';
-import { readHiddenPassword } from './command/readPassword';
+import { readHiddenPassword } from './util/readPassword';
 
 type CliOptions = {
   debug?: true | undefined;
