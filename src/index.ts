@@ -28,6 +28,7 @@ import { commandPass } from './command/pass';
 import { commandPriv } from './command/priv';
 import { commandInteractive } from './command/interactive';
 import { commandFslist } from './command/fslist';
+import { commandTalk } from './command/talk';
 import { readHiddenPassword } from './util/readPassword';
 
 type CliOptions = {
@@ -140,6 +141,55 @@ program
   .action(async () => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandFslist, config);
+  });
+
+program
+  .command('talk')
+  .description('join the Econet Network Conferencer (Talk)')
+  .option('-n, --name <name>', 'your display name (max 12 characters)')
+  .action(async cmdOpts => {
+    const cliOptions = program.opts();
+    const stationOption = cliOptions.station;
+    const localStation =
+      typeof stationOption === 'string' ? parseInt(stationOption) : await getLocalStationNum();
+    if (typeof localStation === 'undefined') {
+      console.error(
+        'You must specify an econet station number using --station or set-station command',
+      );
+      process.exit(1);
+    }
+
+    let name = (cmdOpts.name ?? '').slice(0, 12).trim();
+    if (!name) {
+      const { createInterface } = await import('readline');
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      name = await new Promise<string>(res =>
+        rl.question('What is your name? ', answer => {
+          rl.close();
+          res(answer.slice(0, 12).trim());
+        }),
+      );
+    }
+    if (!name) {
+      console.error('Name is required.');
+      process.exit(1);
+    }
+
+    const deviceName =
+      typeof cliOptions.devicename === 'string' ? cliOptions.devicename : undefined;
+    const debugEnabled = cliOptions.debug === true;
+    driver.setDebugEnabled(debugEnabled);
+    await initConnection(deviceName, localStation, debugEnabled);
+    try {
+      await errorHandlingWrapper(commandTalk, name);
+    } finally {
+      try {
+        await driver.setMode('STOP');
+      } catch {
+        // ignore
+      }
+      await driver.close();
+    }
   });
 
 program
