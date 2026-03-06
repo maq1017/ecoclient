@@ -67,7 +67,9 @@ const isStationAddress = (s: string) => /^\d+(\.\d+)?$/.test(s);
 
 export const commandInteractive = async (initialServerStation: EconetAddress) => {
   let serverStation = initialServerStation;
-  console.log('Entering interactive mode. Type "help" for commands, "exit" to quit.');
+  const localStation = await getLocalStationNum();
+  console.log(`Entering interactive mode for Station ${localStation ?? 'unknown'}`);
+  console.log('Type "help" for commands, "exit" to quit.');
 
   return new Promise<void>(resolve => {
     let closing = false;
