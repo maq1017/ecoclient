@@ -181,7 +181,7 @@ program
     await initConnection(deviceName, localStation, debugEnabled);
     driver.setDebugEnabled(debugEnabled);
     try {
-      await errorHandlingWrapper(commandTalk, name, localStation);
+      await errorHandlingWrapper(commandTalk, name, localStation, debugEnabled);
     } finally {
       try {
         await driver.setMode('STOP');
