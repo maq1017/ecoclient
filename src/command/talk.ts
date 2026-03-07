@@ -1,4 +1,3 @@
-import * as readline from 'readline';
 import { driver, EconetEvent, RxBroadcastEvent, RxTransmitEvent } from '@jprayner/piconet-nodejs';
 import { sleepMs } from '../common';
 import {
@@ -20,6 +19,7 @@ import {
 const PING_INTERVAL_MS = 500;
 const MAX_PING_COUNT = 5;
 const POLL_INTERVAL_MS = 50;
+const PROMPT = '> ';
 
 type TalkUser = {
   station: number;
@@ -27,8 +27,7 @@ type TalkUser = {
   name: string;
 };
 
-const HELP = `
-Commands (prefix with *):
+const HELP = `Commands (prefix with *):
   *A <[net.]stn>  Add a station to the default list
   *C <num>        Change channel number
   *H              This help
@@ -38,10 +37,9 @@ Commands (prefix with *):
 
 Sending messages:
   <message>              Sends to all stations on the default list
-  :<name> <message>      Sends directly to a named user
-`;
+  :<name> <message>      Sends directly to a named user`;
 
-export const commandTalk = async (myName: string, localStation: number) => {
+export const commandTalk = async (myName: string, localStation: number, debug = false) => {
   const users: TalkUser[] = [];
   let channel = TALK_CHANNEL_DEFAULT;
   let pingCount = MAX_PING_COUNT;
@@ -68,10 +66,48 @@ export const commandTalk = async (myName: string, localStation: number) => {
   const formatStation = (station: number, network: number) =>
     network > 0 ? `${network}.${station}` : `${station}`;
 
-  console.log('\nEconet Network Conferencer');
-  console.log(`Channel: ${channel ^ 0x80}`);
-  console.log(`Your name: ${myName}`);
-  console.log('Type *H for help\n');
+  // --- Sticky-input terminal UI ---
+  // The scroll region covers all rows except the last.
+  // Messages are printed into the scroll region (which scrolls up).
+  // The bottom row is redrawn after every message and never scrolls.
+  let inputBuffer = '';
+  let cursorPos = 0;
+
+  const tRows = () => process.stdout.rows || 24;
+
+  const setupTerminal = () => {
+    const r = tRows();
+    process.stdout.write(`\x1b[1;${r - 1}r`);   // set scroll region
+    process.stdout.write(`\x1b[${r};1H\x1b[K${PROMPT}`); // draw input line
+  };
+
+  const restoreTerminal = () => {
+    process.stdout.write('\x1b[r'); // reset scroll region to full screen
+    const r = tRows();
+    process.stdout.write(`\x1b[${r};1H\x1b[K\n`);
+  };
+
+  const redrawInput = () => {
+    const r = tRows();
+    const col = PROMPT.length + cursorPos + 1;
+    process.stdout.write(`\x1b[${r};1H\x1b[K${PROMPT}${inputBuffer}\x1b[${r};${col}H`);
+  };
+
+  const displayMessage = (msg: string) => {
+    const r = tRows();
+    // Move to the last row of the scroll region; a newline here scrolls
+    // the region up by one line, then we write the message on the now-blank row.
+    process.stdout.write(`\x1b[${r - 1};1H\n${msg}\x1b[K`);
+    redrawInput();
+  };
+
+  // Print startup header before the scroll region is active
+  process.stdout.write('\nEconet Network Conferencer\n');
+  process.stdout.write(`Channel: ${channel ^ 0x80}\n`);
+  process.stdout.write(`Your name: ${myName}\n`);
+  process.stdout.write('Type *H for help\n');
+
+  setupTerminal();
 
   const queue = createTalkEventQueue();
   driver.setDebugEnabled(false);
@@ -81,16 +117,21 @@ export const commandTalk = async (myName: string, localStation: number) => {
 
   return new Promise<void>(resolve => {
     let closing = false;
+    let currentPoll: Promise<void> = Promise.resolve();
+    let pollInterval: ReturnType<typeof setInterval>;
 
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      prompt: '> ',
-    });
-
-    const displayMessage = (msg: string) => {
-      process.stdout.write(`\r\x1b[K${msg}\n`);
-      (rl as any)._refreshLine();
+    const cleanup = () => {
+      closing = true;
+      clearInterval(pollInterval);
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
+      process.stdin.pause();
+      process.stdin.removeAllListeners('data');
+      process.stdout.removeAllListeners('resize');
+      restoreTerminal();
+      void currentPoll.then(() => {
+        driver.eventQueueDestroy(queue);
+        resolve();
+      });
     };
 
     const processCommand = async (input: string) => {
@@ -114,9 +155,9 @@ export const commandTalk = async (myName: string, localStation: number) => {
             }
             if (!isNaN(station) && station > 0) {
               addUser(station, network);
-              console.log(`Added station ${formatStation(station, network)}`);
+              displayMessage(`Added station ${formatStation(station, network)}`);
             } else {
-              console.log('Usage: *A <[net.]station>');
+              displayMessage('Usage: *A <[net.]station>');
             }
             break;
           }
@@ -127,49 +168,47 @@ export const commandTalk = async (myName: string, localStation: number) => {
               await sendToAll('>', 'Changing channel');
               channel = (ch | 0x80) & 0xff;
               await sendToAll('>', 'Has arrived');
-              console.log(`Channel changed to ${channel ^ 0x80}`);
+              displayMessage(`Channel changed to ${channel ^ 0x80}`);
             } else {
-              console.log('Usage: *C <channel>');
+              displayMessage('Usage: *C <channel>');
             }
             break;
           }
 
           case 'H':
-            console.log(HELP);
+            for (const line of HELP.split('\n')) displayMessage(line);
             break;
 
           case 'Q':
             void sendToAll('>', 'Logging off');
-            closing = true;
-            console.log('Logging off...');
-            rl.close();
+            displayMessage('Logging off...');
+            cleanup();
             break;
 
           case 'R': {
             const idx = parseInt(arg);
             if (!isNaN(idx) && idx >= 0 && idx < users.length) {
-              console.log(`Removed ${users[idx].name}`);
+              displayMessage(`Removed ${users[idx].name}`);
               users.splice(idx, 1);
             } else {
-              console.log(`Usage: *R <index>  (use *U to list users)`);
+              displayMessage('Usage: *R <index>  (use *U to list users)');
             }
             break;
           }
 
           case 'U':
             if (users.length === 0) {
-              console.log('Nobody on the default list yet.');
+              displayMessage('Nobody on the default list yet.');
             } else {
-              console.log('\nPeople on default:');
+              displayMessage('People on default:');
               users.forEach((u, i) =>
-                console.log(`  ${i}: ${u.name} (${formatStation(u.station, u.network)})`),
+                displayMessage(`  ${i}: ${u.name} (${formatStation(u.station, u.network)})`),
               );
-              console.log('');
             }
             break;
 
           default:
-            console.log(`Unknown command. Type *H for help.`);
+            displayMessage('Unknown command. Type *H for help.');
         }
         return;
       }
@@ -178,7 +217,7 @@ export const commandTalk = async (myName: string, localStation: number) => {
       if (trimmed[0] === ':') {
         const space = trimmed.indexOf(' ', 1);
         if (space < 0) {
-          console.log('Usage: :<name> <message>');
+          displayMessage('Usage: :<name> <message>');
           return;
         }
         const targetName = trimmed.slice(1, space);
@@ -212,14 +251,14 @@ export const commandTalk = async (myName: string, localStation: number) => {
             displayMessage(`[${targetName}: ${e instanceof Error ? e.message : String(e)}]`);
           }
         } else {
-          console.log(`User not found: ${targetName}`);
+          displayMessage(`User not found: ${targetName}`);
         }
         return;
       }
 
       // Broadcast to all
       if (users.length === 0) {
-        console.log('Nobody has responded yet.');
+        displayMessage('Nobody has responded yet.');
         return;
       }
       const errors = await sendToAll(':', trimmed);
@@ -247,6 +286,7 @@ export const commandTalk = async (myName: string, localStation: number) => {
     };
     const me = fmtStn(localStation, 0);
     const dbg = (direction: 'RX' | 'TX', type: 'BCAST' | 'MSG', dst: string, src: string, ctrl: number, port: number, payload: Buffer) => {
+      if (!debug) return;
       const c = ctrl.toString(16).padStart(2, '0');
       const p = port.toString(16).padStart(2, '0');
       displayMessage(`[${direction} ${type.padEnd(5)} ${dst}<-${src} ctrl=${c} port=${p}] ${fmtPayload(payload)}`);
@@ -386,9 +426,7 @@ export const commandTalk = async (myName: string, localStation: number) => {
 
     // Network polling interval — chained so only one poll runs at a time,
     // preventing concurrent broadcasts from confusing the board.
-    let currentPoll: Promise<void> = Promise.resolve();
-
-    const pollInterval = setInterval(() => {
+    pollInterval = setInterval(() => {
       currentPoll = currentPoll
         .then(async () => {
           if (closing) return;
@@ -417,27 +455,57 @@ export const commandTalk = async (myName: string, localStation: number) => {
         .catch(() => {});
     }, POLL_INTERVAL_MS);
 
-    rl.prompt();
+    // Raw key-by-key input
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
 
-    rl.on('line', async (line: string) => {
-      rl.pause();
-      await processCommand(line);
-      if (!closing) {
-        rl.resume();
-        rl.prompt();
+    process.stdin.on('data', async (key: string) => {
+      if (closing) return;
+
+      if (key === '\r' || key === '\n') {
+        const line = inputBuffer;
+        inputBuffer = '';
+        cursorPos = 0;
+        displayMessage(`${PROMPT}${line}`);
+        await processCommand(line);
+        if (!closing) redrawInput();
+      } else if (key === '\x7f' || key === '\b') {
+        // Backspace
+        if (cursorPos > 0) {
+          inputBuffer = inputBuffer.slice(0, cursorPos - 1) + inputBuffer.slice(cursorPos);
+          cursorPos--;
+          redrawInput();
+        }
+      } else if (key === '\x1b[D') {
+        // Left arrow
+        if (cursorPos > 0) { cursorPos--; redrawInput(); }
+      } else if (key === '\x1b[C') {
+        // Right arrow
+        if (cursorPos < inputBuffer.length) { cursorPos++; redrawInput(); }
+      } else if (key === '\x1b[H' || key === '\x01') {
+        // Home / Ctrl-A
+        cursorPos = 0; redrawInput();
+      } else if (key === '\x1b[F' || key === '\x05') {
+        // End / Ctrl-E
+        cursorPos = inputBuffer.length; redrawInput();
+      } else if (key === '\x03' || key === '\x04') {
+        // Ctrl-C / Ctrl-D
+        void sendToAll('>', 'Logging off');
+        cleanup();
+      } else if (key.length === 1 && key >= ' ') {
+        // Printable character
+        inputBuffer = inputBuffer.slice(0, cursorPos) + key + inputBuffer.slice(cursorPos);
+        cursorPos++;
+        redrawInput();
       }
     });
 
-    rl.on('close', () => {
-      clearInterval(pollInterval);
-      // Wait for any in-flight poll (e.g. a broadcast) to finish before
-      // cleanup, so we never race driver.setMode('STOP') against a pending
-      // BCAST command which leaves the board in a bad state.
-      void currentPoll.then(() => {
-        driver.eventQueueDestroy(queue);
-        console.log('');
-        resolve();
-      });
+    process.stdout.on('resize', () => {
+      setupTerminal();
+      redrawInput();
     });
+
+    redrawInput();
   });
 };

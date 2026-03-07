@@ -146,8 +146,8 @@ program
 program
   .command('talk')
   .description('join the Econet Network Conferencer (Talk)')
-  .option('-n, --name <name>', 'your display name (max 12 characters)')
-  .action(async cmdOpts => {
+  .argument('[name]', 'your display name (max 12 characters)')
+  .action(async (nameArg, _cmdOpts) => {
     const cliOptions = program.opts();
     const stationOption = cliOptions.station;
     const localStation =
@@ -159,7 +159,7 @@ program
       process.exit(1);
     }
 
-    let name = (cmdOpts.name ?? '').slice(0, 12).trim();
+    let name = (nameArg ?? '').slice(0, 12).trim();
     if (!name) {
       const { createInterface } = await import('readline');
       const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -181,7 +181,7 @@ program
     await initConnection(deviceName, localStation, debugEnabled);
     driver.setDebugEnabled(debugEnabled);
     try {
-      await errorHandlingWrapper(commandTalk, name, localStation);
+      await errorHandlingWrapper(commandTalk, name, localStation, debugEnabled);
     } finally {
       try {
         await driver.setMode('STOP');

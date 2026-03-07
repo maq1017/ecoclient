@@ -1,3 +1,5 @@
+//Based on & compatible with TALK v5.24 by J.G.Harston
+
 import { driver, EconetEvent, RxBroadcastEvent, RxTransmitEvent } from '@jprayner/piconet-nodejs';
 
 export const TALK_PORT = 0xb0;

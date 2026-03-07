@@ -20,6 +20,7 @@ import { commandRemUser } from './remUser';
 import { commandSave } from './save';
 import { commandSetFileserver } from './setFileserver';
 import { commandFslist } from './fslist';
+import { commandTalk } from './talk';
 import {
   createNotifyListenerQueue,
   extractNotifyChar,
@@ -45,6 +46,7 @@ Commands:
   pass <old> <new>                   Change password
   priv <user> [S|N]                  Set user privilege level
   fslist                             List file servers on the network
+  talk [name]                        Enter Talk (Econet Network Conferencer)
   help                               Show this help
   exit                               Exit interactive mode
 `;
@@ -75,6 +77,7 @@ export const commandInteractive = async (initialServerStation: EconetAddress) =>
     let closing = false;
     let passwordResolve: ((s: string) => void) | null = null;
     let isBusy = false;
+    let pendingTalk: { name: string } | null = null;
     const pendingNotifications: string[] = [];
     const notifyBuffers = new Map<string, NotifyBuffer>();
     const notifyQueue = createNotifyListenerQueue();
@@ -260,6 +263,25 @@ export const commandInteractive = async (initialServerStation: EconetAddress) =>
           case 'fslist':
             await commandFslist();
             break;
+          case 'talk': {
+            if (localStation === undefined) {
+              throw new Error('Local station number not set - please run set-station first');
+            }
+            let talkName = args[0]?.slice(0, 12).trim() || '';
+            if (!talkName) {
+              talkName = await new Promise<string>(res =>
+                rl.question('What is your name? ', ans => res(ans.slice(0, 12).trim())),
+              );
+            }
+            if (!talkName) {
+              console.log('Name is required.');
+              break;
+            }
+            pendingTalk = { name: talkName };
+            closing = true;
+            rl.close();
+            return;
+          }
           case 'help':
             console.log(HELP);
             break;
@@ -297,8 +319,17 @@ export const commandInteractive = async (initialServerStation: EconetAddress) =>
     rl.on('close', () => {
       clearInterval(notifyPollInterval);
       driver.eventQueueDestroy(notifyQueue);
-      console.log('');
-      resolve();
+      if (pendingTalk) {
+        const { name } = pendingTalk;
+        pendingTalk = null;
+        commandTalk(name, localStation!, false)
+          .then(() => commandInteractive(serverStation))
+          .then(resolve)
+          .catch(() => resolve());
+      } else {
+        console.log('');
+        resolve();
+      }
     });
   });
 };
