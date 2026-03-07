@@ -178,10 +178,10 @@ program
     const deviceName =
       typeof cliOptions.devicename === 'string' ? cliOptions.devicename : undefined;
     const debugEnabled = cliOptions.debug === true;
-    driver.setDebugEnabled(debugEnabled);
     await initConnection(deviceName, localStation, debugEnabled);
+    driver.setDebugEnabled(debugEnabled);
     try {
-      await errorHandlingWrapper(commandTalk, name);
+      await errorHandlingWrapper(commandTalk, name, localStation);
     } finally {
       try {
         await driver.setMode('STOP');
@@ -189,6 +189,10 @@ program
         // ignore
       }
       await driver.close();
+      // Readline's close() internally calls stdin.resume(), which leaves stdin
+      // as a referenced handle that would keep the process alive. Unref it here,
+      // after all driver cleanup is done, so the process can exit cleanly.
+      process.stdin.unref();
     }
   });
 

@@ -12,14 +12,13 @@ import {
   parseTalkMessage,
   parseServerReply,
   sendTalkFind,
-  sendServerFind,
   sendTalkReply,
   sendServerReply,
   sendTalkMessage,
 } from '../protocol/talk';
 
-const PING_INTERVAL_MS = 3000;
-const MAX_PING_COUNT = 30;
+const PING_INTERVAL_MS = 500;
+const MAX_PING_COUNT = 5;
 const POLL_INTERVAL_MS = 50;
 
 type TalkUser = {
@@ -42,7 +41,7 @@ Sending messages:
   :<name> <message>      Sends directly to a named user
 `;
 
-export const commandTalk = async (myName: string) => {
+export const commandTalk = async (myName: string, localStation: number) => {
   const users: TalkUser[] = [];
   let channel = TALK_CHANNEL_DEFAULT;
   let pingCount = MAX_PING_COUNT;
@@ -69,38 +68,16 @@ export const commandTalk = async (myName: string) => {
   const formatStation = (station: number, network: number) =>
     network > 0 ? `${network}.${station}` : `${station}`;
 
-  const sendToAll = async (flag: string, message: string) => {
-    for (const user of users) {
-      try {
-        await sendTalkMessage(user.station, user.network, flag, myName, message, channel);
-        await sleepMs(10);
-      } catch {
-        // ignore individual send errors
-      }
-    }
-    lastPingMs = Date.now();
-  };
-
   console.log('\nEconet Network Conferencer');
   console.log(`Channel: ${channel ^ 0x80}`);
   console.log(`Your name: ${myName}`);
-  console.log('Broadcasting presence...\n');
+  console.log('Type *H for help\n');
 
   const queue = createTalkEventQueue();
+  driver.setDebugEnabled(false);
 
-  // Send initial discovery broadcasts
-  for (let i = 0; i < 5; i++) {
-    try {
-      await sendTalkFind();
-      await sendServerFind();
-    } catch {
-      // ignore
-    }
-    await sleepMs(100);
-  }
-  lastPingMs = Date.now();
-
-  console.log('Type *H for help\n');
+  // Trigger first ping immediately rather than waiting PING_INTERVAL_MS
+  lastPingMs = Date.now() - PING_INTERVAL_MS;
 
   return new Promise<void>(resolve => {
     let closing = false;
@@ -112,9 +89,8 @@ export const commandTalk = async (myName: string) => {
     });
 
     const displayMessage = (msg: string) => {
-      const currentLine = (rl as any).line as string || '';
       process.stdout.write(`\r\x1b[K${msg}\n`);
-      process.stdout.write(`> ${currentLine}`);
+      (rl as any)._refreshLine();
     };
 
     const processCommand = async (input: string) => {
@@ -163,8 +139,9 @@ export const commandTalk = async (myName: string) => {
             break;
 
           case 'Q':
-            await sendToAll('>', 'Logging off');
+            void sendToAll('>', 'Logging off');
             closing = true;
+            console.log('Logging off...');
             rl.close();
             break;
 
@@ -226,9 +203,13 @@ export const commandTalk = async (myName: string) => {
 
         if (target) {
           try {
-            await sendTalkMessage(target.station, target.network, ']', myName, message, channel);
+            dbg('TX', 'MSG', fmtStn(target.station, target.network), me, channel, TALK_PORT, buildMsgPayload(']', myName, message));
+            const result = await sendTalkMessage(target.station, target.network, ']', myName, message, channel);
+            if (!result.success) {
+              displayMessage(`[${targetName}: ${result.description}]`);
+            }
           } catch (e) {
-            console.error(e instanceof Error ? e.message : e);
+            displayMessage(`[${targetName}: ${e instanceof Error ? e.message : String(e)}]`);
           }
         } else {
           console.log(`User not found: ${targetName}`);
@@ -241,15 +222,67 @@ export const commandTalk = async (myName: string) => {
         console.log('Nobody has responded yet.');
         return;
       }
-      try {
-        await sendToAll(':', trimmed);
-      } catch (e) {
-        console.error(e instanceof Error ? e.message : e);
+      const errors = await sendToAll(':', trimmed);
+      for (const { user, error } of errors) {
+        displayMessage(`[${user.name}: ${error}]`);
       }
+    };
+
+    const fmtStn = (station: number, network: number) =>
+      `${network.toString().padStart(3, '0')}.${station.toString().padStart(3, '0')}`;
+    const fmtPayload = (buf: Buffer) => {
+      const hex = buf.toString('hex').replace(/../g, '$& ').trim();
+      const ascii = buf.toString('ascii').replace(/[^\x20-\x7e]/g, '.');
+      return `${hex}  "${ascii}"`;
+    };
+    const buildMsgPayload = (flag: string, name: string, message: string) => {
+      const parts: number[] = [flag.charCodeAt(0), 0x00];
+      if (flag !== ';') {
+        for (const ch of name) parts.push(ch === ' ' ? 0x80 : ch.charCodeAt(0));
+        parts.push(0x0d);
+      }
+      for (const ch of message) parts.push(ch.charCodeAt(0));
+      parts.push(0x0d);
+      return Buffer.from(parts);
+    };
+    const me = fmtStn(localStation, 0);
+    const dbg = (direction: 'RX' | 'TX', type: 'BCAST' | 'MSG', dst: string, src: string, ctrl: number, port: number, payload: Buffer) => {
+      const c = ctrl.toString(16).padStart(2, '0');
+      const p = port.toString(16).padStart(2, '0');
+      displayMessage(`[${direction} ${type.padEnd(5)} ${dst}<-${src} ctrl=${c} port=${p}] ${fmtPayload(payload)}`);
+    };
+
+    const debugEvent = (event: EconetEvent) => {
+      if (event instanceof RxBroadcastEvent) {
+        const f = event.econetFrame;
+        dbg('RX', 'BCAST', fmtStn(f[0], f[1]), fmtStn(f[2], f[3]), f[4], f[5], f.slice(6));
+      } else if (event instanceof RxTransmitEvent) {
+        const s = event.scoutFrame;
+        dbg('RX', 'MSG', fmtStn(s[0], s[1]), fmtStn(s[2], s[3]), s[4], s[5], event.dataFrame.slice(4));
+      }
+    };
+
+    const sendToAll = async (flag: string, message: string): Promise<Array<{ user: TalkUser; error: string }>> => {
+      const errors: Array<{ user: TalkUser; error: string }> = [];
+      for (const user of users) {
+        try {
+          dbg('TX', 'MSG', fmtStn(user.station, user.network), me, channel, TALK_PORT, buildMsgPayload(flag, myName, message));
+          const result = await sendTalkMessage(user.station, user.network, flag, myName, message, channel);
+          if (!result.success) {
+            errors.push({ user, error: result.description });
+          }
+          await sleepMs(10);
+        } catch (e) {
+          errors.push({ user, error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      lastPingMs = Date.now();
+      return errors;
     };
 
     // Incoming packet handler
     const handleEvent = async (event: EconetEvent) => {
+      debugEvent(event);
       if (event instanceof RxBroadcastEvent) {
         const { srcStation, srcNetwork, data } = parseBroadcast(event);
 
@@ -266,6 +299,7 @@ export const commandTalk = async (myName: string) => {
         // TalkFind ("TALK    ") — reply to acknowledge
         if (data.length >= 8 && data.slice(0, 8).equals(Buffer.from('TALK    '))) {
           try {
+            dbg('TX', 'MSG', fmtStn(srcStation, srcNetwork), me, TALK_CTRL_DISCOVER, TALK_PORT, Buffer.from('TALK_RPL'));
             await sendTalkReply(srcStation, srcNetwork);
           } catch {
             // ignore
@@ -279,6 +313,12 @@ export const commandTalk = async (myName: string) => {
           addUser(srcStation, srcNetwork);
           if (wasNew) {
             displayMessage(`[Station ${formatStation(srcStation, srcNetwork)} acknowledged]`);
+            try {
+              dbg('TX', 'MSG', fmtStn(srcStation, srcNetwork), me, channel, TALK_PORT, buildMsgPayload('>', myName, 'Logging on'));
+              await sendTalkMessage(srcStation, srcNetwork, '>', myName, 'Logging on', channel);
+            } catch {
+              // ignore
+            }
           }
         }
       } else if (event instanceof RxTransmitEvent) {
@@ -293,6 +333,7 @@ export const commandTalk = async (myName: string) => {
             if (wasNew) {
               displayMessage(`[Station ${formatStation(srcStation, srcNetwork)} (${name}) joined]`);
               try {
+                dbg('TX', 'MSG', fmtStn(srcStation, srcNetwork), me, channel, TALK_PORT, buildMsgPayload('>', myName, 'Logging on'));
                 await sendTalkMessage(srcStation, srcNetwork, '>', myName, 'Logging on', channel);
               } catch {
                 // ignore
@@ -311,6 +352,20 @@ export const commandTalk = async (myName: string) => {
             addUser(srcStation, srcNetwork);
             if (wasNew) {
               displayMessage(`[Station ${formatStation(srcStation, srcNetwork)} acknowledged]`);
+              try {
+                dbg('TX', 'MSG', fmtStn(srcStation, srcNetwork), me, channel, TALK_PORT, buildMsgPayload('>', myName, 'Logging on'));
+                await sendTalkMessage(srcStation, srcNetwork, '>', myName, 'Logging on', channel);
+              } catch {
+                // ignore
+              }
+            }
+          } else if (data.length >= 8 && data.slice(0, 8).equals(Buffer.from('TALK    '))) {
+            // TalkFind received as unicast (bridge converts broadcast→unicast) — reply with TALKRPL
+            try {
+              dbg('TX', 'MSG', fmtStn(srcStation, srcNetwork), me, TALK_CTRL_DISCOVER, TALK_PORT, Buffer.from('TALK_RPL'));
+              await sendTalkReply(srcStation, srcNetwork);
+            } catch {
+              // ignore
             }
           }
           return;
@@ -329,25 +384,37 @@ export const commandTalk = async (myName: string) => {
       }
     };
 
-    // Network polling interval
-    const pollInterval = setInterval(async () => {
-      // Drain and handle all queued events
-      let event: EconetEvent | undefined;
-      while ((event = driver.eventQueueShift(queue)) !== undefined) {
-        await handleEvent(event);
-      }
+    // Network polling interval — chained so only one poll runs at a time,
+    // preventing concurrent broadcasts from confusing the board.
+    let currentPoll: Promise<void> = Promise.resolve();
 
-      // Periodic presence broadcasts
-      const now = Date.now();
-      if (pingCount > 0 && now - lastPingMs >= PING_INTERVAL_MS) {
-        try {
-          await sendTalkFind();
-          lastPingMs = now;
-          pingCount--;
-        } catch {
-          // ignore
-        }
-      }
+    const pollInterval = setInterval(() => {
+      currentPoll = currentPoll
+        .then(async () => {
+          if (closing) return;
+
+          // Drain and handle all queued events
+          let event: EconetEvent | undefined;
+          while ((event = driver.eventQueueShift(queue)) !== undefined) {
+            await handleEvent(event);
+          }
+
+          // Periodic presence broadcasts
+          if (!closing) {
+            const now = Date.now();
+            if (pingCount > 0 && now - lastPingMs >= PING_INTERVAL_MS) {
+              try {
+                dbg('TX', 'BCAST', '255.255', me, TALK_CTRL_DISCOVER, TALK_PORT, Buffer.from('TALK    '));
+                await sendTalkFind();
+                lastPingMs = now;
+                pingCount--;
+              } catch {
+                // ignore
+              }
+            }
+          }
+        })
+        .catch(() => {});
     }, POLL_INTERVAL_MS);
 
     rl.prompt();
@@ -363,9 +430,14 @@ export const commandTalk = async (myName: string) => {
 
     rl.on('close', () => {
       clearInterval(pollInterval);
-      driver.eventQueueDestroy(queue);
-      console.log('');
-      resolve();
+      // Wait for any in-flight poll (e.g. a broadcast) to finish before
+      // cleanup, so we never race driver.setMode('STOP') against a pending
+      // BCAST command which leaves the board in a bad state.
+      void currentPoll.then(() => {
+        driver.eventQueueDestroy(queue);
+        console.log('');
+        resolve();
+      });
     });
   });
 };

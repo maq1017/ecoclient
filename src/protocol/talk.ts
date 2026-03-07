@@ -5,16 +5,18 @@ export const TALK_REPLY_PORT = 0xb1;
 export const TALK_CTRL_DISCOVER = 0x80;
 export const TALK_CHANNEL_DEFAULT = 0x81;
 
+const TALK_BROADCAST_TIMEOUT_MS = 1000;
+
 // Broadcast: TalkFind — announces our presence, triggers TalkReply from others
 export const sendTalkFind = async () => {
   const data = Buffer.concat([Buffer.from([TALK_CTRL_DISCOVER, TALK_PORT]), Buffer.from('TALK    ')]);
-  return driver.broadcast(data);
+  return driver.broadcast(data, TALK_BROADCAST_TIMEOUT_MS);
 };
 
 // Broadcast: ServerFind — asks existing clients to identify themselves with name
 export const sendServerFind = async () => {
   const data = Buffer.concat([Buffer.from([TALK_CTRL_DISCOVER, TALK_PORT]), Buffer.from('        ')]);
-  return driver.broadcast(data);
+  return driver.broadcast(data, TALK_BROADCAST_TIMEOUT_MS);
 };
 
 // Response to a TalkFind broadcast
@@ -62,10 +64,7 @@ export const sendTalkMessage = async (
 export const createTalkEventQueue = () => {
   return driver.eventQueueCreate(
     (event: EconetEvent) =>
-      (event instanceof RxBroadcastEvent &&
-        event.econetFrame.length >= 6 &&
-        event.econetFrame[4] === TALK_CTRL_DISCOVER &&
-        event.econetFrame[5] === TALK_PORT) ||
+      event instanceof RxBroadcastEvent ||
       (event instanceof RxTransmitEvent &&
         event.scoutFrame.length >= 6 &&
         (event.scoutFrame[5] === TALK_PORT || event.scoutFrame[5] === TALK_REPLY_PORT)),
