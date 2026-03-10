@@ -12,10 +12,23 @@ export const replyPort = 0x90;
 
 export const stripCRs = (str: string) => str.replace(/\r/g, '');
 
+export type EconetAddress = {
+  network: number;
+  station: number;
+};
+
+export const parseEconetAddress = (input: string): EconetAddress => {
+  const parts = input.split('.');
+  if (parts.length === 2) {
+    return { network: parseInt(parts[0], 10), station: parseInt(parts[1], 10) };
+  }
+  return { network: 0, station: parseInt(input, 10) };
+};
+
 export type ConfigOptions = {
   deviceName: string;
   localStation: number;
-  serverStation: number;
+  serverStation: EconetAddress;
   debugEnabled: boolean;
 };
 
@@ -86,18 +99,18 @@ export const initConnection = async (
 };
 
 export const eventQueueForReceiveTxEvent = (
-  serverStation: number,
+  serverStation: EconetAddress,
   controlByte: number | undefined,
   ports: number[],
 ) => {
   return driver.eventQueueCreate(
-    responseMatcher(serverStation, 0, controlByte, ports),
+    responseMatcher(serverStation.station, serverStation.network, controlByte, ports),
   );
 };
 
 export const waitForReceiveTxEvent = async (
   queue: driver.EventQueue,
-  serverStation: number,
+  serverStation: EconetAddress,
   description?: string,
 ) => {
   const receiveTxEventTimeoutMs = 20000;
@@ -106,11 +119,12 @@ export const waitForReceiveTxEvent = async (
     receiveTxEventTimeoutMs,
     description || 'valid RxTransmitEvent',
   );
+  const stationLabel = `${serverStation.network}.${serverStation.station}`;
   if (!(rxTransmitEvent instanceof RxTransmitEvent)) {
-    throw new Error(`Unexpected response from station ${serverStation}`);
+    throw new Error(`Unexpected response from station ${stationLabel}`);
   }
   if (rxTransmitEvent.dataFrame.length < 6) {
-    throw new Error(`Malformed response from station ${serverStation}`);
+    throw new Error(`Malformed response from station ${stationLabel}`);
   }
   return {
     controlByte: rxTransmitEvent.scoutFrame[4],
@@ -122,7 +136,7 @@ export const waitForReceiveTxEvent = async (
 };
 
 export const executeCliCommand = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   command: string,
   handles: DirectoryHandles,
 ) => {
@@ -141,8 +155,8 @@ export const executeCliCommand = async (
 
   try {
     const txResult = await driver.transmit(
-      serverStation,
-      0,
+      serverStation.station,
+      serverStation.network,
       fsControlByte,
       fsPort,
       msg,
@@ -150,7 +164,7 @@ export const executeCliCommand = async (
 
     if (!txResult.success) {
       throw new Error(
-        `Failed to send command to station ${serverStation}: ${txResult.description}`,
+        `Failed to send command to station ${serverStation.network}.${serverStation.station}: ${txResult.description}`,
       );
     }
 

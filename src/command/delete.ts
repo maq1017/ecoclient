@@ -1,3 +1,4 @@
+import { EconetAddress } from '../common';
 import { getHandles } from '../config';
 import { readAccessObjectInfo } from '../protocol/objectInfo';
 import { deleteFile } from '../protocol/simpleCli';
@@ -16,7 +17,7 @@ import {
 const MAX_RETRIES = 3;
 
 export const commandDelete = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   filename: string,
   recurse: boolean,
   force: boolean,
@@ -58,7 +59,7 @@ export const commandDelete = async (
 };
 
 const deleteDir = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   remotePath: string,
   recurse: boolean,
   promptTracker: DeletePromptTracker,
@@ -92,7 +93,7 @@ const deleteDir = async (
 };
 
 const deleteMultipleFiles = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   dirPath: string,
   wildcardPattern: string,
   recurse: boolean,
@@ -135,7 +136,7 @@ const deleteMultipleFiles = async (
 };
 
 const deleteSingleFileWithRetries = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   srcFilename: string,
   type: FileType,
   promptTracker: DeletePromptTracker,

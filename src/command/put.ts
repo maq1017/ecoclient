@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  EconetAddress,
   fileInfoFromFilename,
   isLoadExecFilename,
   loadFileInfo,
@@ -25,7 +26,7 @@ import { chdir } from 'process';
 const MAX_RETRIES = 3;
 
 const putDfsImage = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   localImagePath: string,
   remotePath: string,
   isDoubleSided: boolean,
@@ -59,7 +60,7 @@ const putDfsImage = async (
 };
 
 export const commandPut = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   localPath: string,
   recurse: boolean,
   force: boolean,
@@ -147,7 +148,7 @@ export const commandPut = async (
 };
 
 const putMultipleFiles = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   localDirPath: string,
   filenameExpression: string,
   remotePath: string,
@@ -244,7 +245,7 @@ const putMultipleFiles = async (
 };
 
 const putSingleFileWithRetries = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   localFilePath: string,
   remoteDir: string,
   overwriteTracker: FileOverwriteTracker,
@@ -301,7 +302,7 @@ const putSingleFileWithRetries = async (
 };
 
 const putSingleFile = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   localFilePath: string,
   remoteDir: string,
 ) => {
@@ -338,7 +339,7 @@ enum OverwritePromptResult {
 }
 
 const promptOverwriteDeleteIfNecessary = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   remotePath: string,
   newFileType: FileType,
   overwriteTracker: FileOverwriteTracker,

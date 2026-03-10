@@ -13,6 +13,7 @@ export type MetadataType = 'inf' | 'filename' | 'none';
 type Config = {
   localStationNum: number | undefined;
   serverStationNum: number;
+  serverNetworkNum: number;
   handleUserRootDir: number | undefined;
   handleCurrentDir: number | undefined;
   handleLibDir: number | undefined;
@@ -22,6 +23,7 @@ type Config = {
 const defaultConfig: Config = {
   localStationNum: undefined,
   serverStationNum: 254,
+  serverNetworkNum: 0,
   handleUserRootDir: undefined,
   handleCurrentDir: undefined,
   handleLibDir: undefined,
@@ -69,6 +71,17 @@ export const setServerStationNum = async (
 
   const config = await readConfigOrUseDefault();
   config.serverStationNum = stationNum;
+  await writeConfig(config);
+};
+
+export const getServerNetworkNum = async (): Promise<number> => {
+  const { serverNetworkNum } = await readConfigOrUseDefault();
+  return serverNetworkNum;
+};
+
+export const setServerNetworkNum = async (networkNum: number): Promise<void> => {
+  const config = await readConfigOrUseDefault();
+  config.serverNetworkNum = networkNum;
   await writeConfig(config);
 };
 
@@ -201,6 +214,12 @@ const readConfig = async (): Promise<Config> => {
       ? fileAsObject.serverStationNum
       : undefined;
 
+  const serverNetworkNum =
+    'serverNetworkNum' in fileAsObject &&
+    typeof fileAsObject.serverNetworkNum === 'number'
+      ? fileAsObject.serverNetworkNum
+      : 0;
+
   const handleUserRootDir =
     'handleUserRootDir' in fileAsObject &&
     typeof fileAsObject.handleUserRootDir === 'number'
@@ -233,6 +252,7 @@ const readConfig = async (): Promise<Config> => {
     serverStationNum:
       validStationNumOrUndefined(serverStationNum) ??
       defaultConfig.serverStationNum,
+    serverNetworkNum,
     handleUserRootDir,
     handleCurrentDir,
     handleLibDir,
@@ -247,6 +267,7 @@ const readConfigOrUseDefault = async (): Promise<Config> => {
     return {
       localStationNum: defaultConfig.localStationNum,
       serverStationNum: defaultConfig.serverStationNum,
+      serverNetworkNum: defaultConfig.serverNetworkNum,
       handleUserRootDir: defaultConfig.handleUserRootDir,
       handleCurrentDir: defaultConfig.handleCurrentDir,
       handleLibDir: defaultConfig.handleLibDir,

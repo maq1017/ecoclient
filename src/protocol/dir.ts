@@ -1,7 +1,7 @@
-import { DirectoryHandles, executeCliCommand } from '../common';
+import { DirectoryHandles, EconetAddress, executeCliCommand } from '../common';
 
 export const dir = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   path: string,
   handles: DirectoryHandles,
 ) => {
@@ -13,7 +13,7 @@ export const dir = async (
 
   if (serverReply.data.length < 1) {
     throw new Error(
-      `Malformed response from station ${serverStation}: success but not enough data`,
+      `Malformed response from station ${serverStation.network}.${serverStation.station}: success but not enough data`,
     );
   }
 

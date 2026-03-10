@@ -31,18 +31,19 @@ This project is still under development. Currently:
 
 ## Commands
 
-### set-fs [station]
+### set-fs [net].[station]
 
 Sets the fileserver station number. Defaults to 254.
 
-| Argument | Description                              |
-| -------- | ---------------------------------------- |
-| station  | Fileserver station number in range 1-254 |
+| Argument     | Description                                           |
+| ------------ | ----------------------------------------------------- |
+| net.station  | Fileserver net & station numbers in range 1-254.1-254 |
 
 Example:
 
 ```
-ecoclient set-fs 1
+ecoclient set-fs 254
+ecoclient set-fs 2.254
 ```
 
 ## set-station [station]
@@ -59,14 +60,14 @@ Example:
 ecoclient set-station 32
 ```
 
-## notify [station] [message]
+## notify [net].[station] [message]
 
 Sends a notification message to a station like a `*NOTIFY` command.
 
-| Argument | Description                                                     |
-| -------- | --------------------------------------------------------------- |
-| station  | Station number to send a message to in range 1-254              |
-| message  | The text of the message (may include a \r to execute a command) |
+| Argument | Description                                                              |
+| -------- | ------------------------------------------------------------------------ |
+| station  | Station number to send a message to in range 1-254 or 1-254.1-254        |
+| message  | The text of the message (may include a \r to execute a command)          |
 
 ## monitor
 
@@ -82,15 +83,16 @@ ecoclient monitor
 
 Login to fileserver like a `*I AM` command. Directory handles (e.g. current directory) are persisted such that they take effect with other commands like `dir`.
 
-| Argument | Description                                  |
-| -------- | -------------------------------------------- |
-| username | Registered username, known to the fileserver |
-| password | Password which corresponds to `username`     |
+| Argument | Description                                                                     |
+| -------- | ------------------------------------------------------------------------------- |
+| username | Registered username, known to the fileserver                                    |
+| password | Password which corresponds to `username`. Use `:` to be prompted securely.      |
 
-Example:
+Examples:
 
 ```
-ecoclient i-am JPR93 MYPASS
+ecoclient i-am JPR93 MYPASS   # password in plain text
+ecoclient i-am JPR93 :        # prompted securely (no echo)
 ```
 
 ## bye
@@ -340,3 +342,50 @@ priv susan S   # let's be besties, have the keys to my front door
 priv brian     # screw this guy, bust him down to private
 priv adrian N  # screw this guy, bust him down to private
 ```
+
+## -i, --interactive
+
+Start an interactive shell session with the fileserver. All of the fileserver commands above are available as interactive commands, typed at the `ecoclient>` prompt, without the `ecoclient` prefix.
+
+```
+ecoclient -i
+ecoclient --interactive
+```
+
+Type `help` at the prompt for a command summary, and `exit` or `quit` (or Ctrl-D) to leave.
+
+### i-am in interactive mode
+
+In interactive mode, `i-am` accepts two forms and also responds to `i am` (with a space) as an alias:
+
+**Standard login (same as CLI):**
+
+```
+ecoclient> i-am <username> [password]
+ecoclient> i am <username> [password]
+```
+
+Use `:` as the password to be prompted securely with no characters shown on screen:
+
+```
+ecoclient> i-am JPR93 :
+ecoclient> i am JPR93 :
+```
+
+**Login with station override (interactive mode only):**
+
+```
+ecoclient> i-am [net].[station] <username> [password]
+ecoclient> i am [net].[station] <username> [password]
+```
+
+When a station address is provided as the first argument, interactive mode will update the fileserver target for the remainder of the session before performing the login. This is useful when you want to switch to a different fileserver without restarting. The station can be given as a plain station number or in `network.station` notation:
+
+```
+ecoclient> i-am 254 SYSOP MYPASS       # station 254 on network 0
+ecoclient> i-am 1.254 SYSOP MYPASS     # station 254 on network 1
+ecoclient> i am 1.254 SYSOP MYPASS     # same, using "i am" alias
+ecoclient> i-am 1.254 SYSOP :          # station override with secure prompt
+```
+
+> **Note:** the station override form of `i-am` is only available in interactive mode. The standard `ecoclient i-am` CLI command always uses the fileserver configured via `set-fs`.

@@ -54,7 +54,7 @@ describe('save protocol handler', () => {
       .spyOn(driver, 'eventQueueWait')
       .mockResolvedValueOnce(dummySaveStatusOkEvent());
 
-    await save(254, fileData, 'FNAME', loadAddr, execAddr, {
+    await save({ network: 0, station: 254 }, fileData, 'FNAME', loadAddr, execAddr, {
       userRoot: 0,
       current: 1,
       library: 2,
@@ -97,7 +97,7 @@ describe('save protocol handler', () => {
       .spyOn(driver, 'eventQueueWait')
       .mockResolvedValueOnce(dummySaveStatusOkEvent());
 
-    await save(254, fileData, 'FNAME', loadAddr, execAddr, {
+    await save({ network: 0, station: 254 }, fileData, 'FNAME', loadAddr, execAddr, {
       userRoot: 0,
       current: 1,
       library: 2,
@@ -142,7 +142,7 @@ describe('save protocol handler', () => {
       .mockResolvedValue(dummySaveCommandErrorResponse());
 
     await expect(
-      save(254, fileData, 'FNAME', loadAddr, execAddr, {
+      save({ network: 0, station: 254 }, fileData, 'FNAME', loadAddr, execAddr, {
         userRoot: 0,
         current: 1,
         library: 2,
@@ -159,12 +159,12 @@ describe('save protocol handler', () => {
     });
 
     await expect(
-      save(254, fileData, 'FNAME', loadAddr, execAddr, {
+      save({ network: 0, station: 254 }, fileData, 'FNAME', loadAddr, execAddr, {
         userRoot: 0,
         current: 1,
         library: 2,
       }),
-    ).rejects.toThrow('Failed to send SAVE command to station 254');
+    ).rejects.toThrow('Failed to send SAVE command to station 0.254');
   });
 
   it('should retry block on error', async () => {
@@ -202,7 +202,7 @@ describe('save protocol handler', () => {
       .spyOn(driver, 'eventQueueWait')
       .mockResolvedValueOnce(dummySaveStatusOkEvent());
 
-    await save(254, fileData, 'FNAME', loadAddr, execAddr, {
+    await save({ network: 0, station: 254 }, fileData, 'FNAME', loadAddr, execAddr, {
       userRoot: 0,
       current: 1,
       library: 2,

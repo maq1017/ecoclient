@@ -48,7 +48,7 @@ describe('commandGet', () => {
 
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
 
-      await commandGet(254, 'MYFILE', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -63,7 +63,7 @@ describe('commandGet', () => {
 
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
 
-      await commandGet(254, 'MYFILE', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE,12345678,87654321',
@@ -78,7 +78,7 @@ describe('commandGet', () => {
 
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
 
-      await commandGet(254, 'MYFILE', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -100,7 +100,7 @@ describe('commandGet', () => {
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
       const rmSyncSpy = jest.spyOn(fs, 'rmSync');
 
-      await commandGet(254, 'MYFILE', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(writeFileSyncSpy).not.toHaveBeenCalled();
       expect(rmSyncSpy).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe('commandGet', () => {
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
       const rmSyncSpy = jest.spyOn(fs, 'rmSync');
 
-      await commandGet(254, 'MYFILE', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -143,7 +143,7 @@ describe('commandGet', () => {
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
       const rmSyncSpy = jest.spyOn(fs, 'rmSync');
 
-      await commandGet(254, 'MYFILE', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -171,7 +171,7 @@ describe('commandGet', () => {
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
       const rmSyncSpy = jest.spyOn(fs, 'rmSync');
 
-      await commandGet(254, 'MYFILE', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -228,7 +228,7 @@ describe('commandGet', () => {
 
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
 
-      await commandGet(254, 'MYFILE*', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE*', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -305,7 +305,7 @@ describe('commandGet', () => {
           return undefined;
         });
 
-      await commandGet(254, 'MY*', true, false);
+      await commandGet({ network: 0, station: 254 }, 'MY*', true, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -367,7 +367,7 @@ describe('commandGet', () => {
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
       const mkDirSyncSpy = jest.spyOn(fs, 'mkdirSync');
 
-      await commandGet(254, 'MYFILE*', false, false);
+      await commandGet({ network: 0, station: 254 }, 'MYFILE*', false, false);
 
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
         'MYFILE',
@@ -422,7 +422,7 @@ describe('commandGet', () => {
         });
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
 
-      await commandGet(254, 'MYDIR', true, false);
+      await commandGet({ network: 0, station: 254 }, 'MYDIR', true, false);
 
       expect(mkDirSyncSpy).toHaveBeenCalledWith('MYDIR');
       expect(writeFileSyncSpy).toHaveBeenCalledWith(
@@ -452,7 +452,7 @@ describe('commandGet', () => {
         });
       const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
 
-      await expect(commandGet(254, 'MYDIR', false, false)).rejects.toThrow(
+      await expect(commandGet({ network: 0, station: 254 }, 'MYDIR', false, false)).rejects.toThrow(
         "'MYDIR' is a directory, specify -r to recurse",
       );
 

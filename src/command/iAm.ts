@@ -1,3 +1,4 @@
+import { EconetAddress } from '../common';
 import { iAm } from '../protocol/iAm';
 import {
   setHandleCurrentDir,
@@ -6,7 +7,7 @@ import {
 } from '../config';
 
 export const commandIAm = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   username: string,
   password: string,
 ) => {

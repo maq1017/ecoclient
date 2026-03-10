@@ -1,5 +1,6 @@
 import { basename } from 'path';
 import { spawnSync } from 'child_process';
+import { EconetAddress } from '../common';
 import { save } from '../protocol/save';
 import { getHandles } from '../config';
 
@@ -7,7 +8,7 @@ const basicLoadAddr = 0xffff0e00;
 const basicExecAddr = 0xffff2b80;
 
 export const commandSave = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   localPath: string,
   optionalDestPath: string | undefined,
 ) => {

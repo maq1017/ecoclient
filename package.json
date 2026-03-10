@@ -1,6 +1,6 @@
 {
   "name": "@jprayner/ecoclient",
-  "version": "2.0.17",
+  "version": "2.1.0",
   "description": "Command-line utility for performing Econet operations using Piconet hardware.",
   "bin": {
     "ecoclient": "./build/index.js"
@@ -9,6 +9,7 @@
   "scripts": {
     "prebuild": "node -p \"'export const PKG_VERSION = \\'' + require('./package.json').version + '\\';'\" > src/version.ts",
     "build": "tsc",
+    "postbuild": "node -e \"require('fs').chmodSync('build/index.js', '755')\"",
     "start": "npm run build && node build/index.js",
     "test": "jest --no-cache --runInBand --detectOpenHandles --coverage --config=jest.config.js",
     "lint": "prettier --check . && eslint . --ext .ts,.js",
@@ -67,7 +68,7 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
-    "@jprayner/piconet-nodejs": "^2.0.19",
+    "@jprayner/piconet-nodejs": "file:../piconet/driver/nodejs",
     "@commander-js/extra-typings": "^11.0.0",
     "commander": "^11.0.0"
   },

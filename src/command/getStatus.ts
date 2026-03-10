@@ -10,7 +10,7 @@ export const commandGetStatus = async (configOptions: ConfigOptions) => {
     }`,
   );
   console.log(`Local station no.  : ${configOptions.localStation}`);
-  console.log(`Server station no. : ${configOptions.serverStation}`);
+  console.log(`Server station no. : ${configOptions.serverStation.network}.${configOptions.serverStation.station}`);
   console.log(
     `Debug enabled      : ${configOptions.debugEnabled ? 'true' : 'false'}`,
   );

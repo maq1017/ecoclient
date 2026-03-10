@@ -2,9 +2,9 @@
 import { driver } from '@jprayner/piconet-nodejs';
 import { Command } from '@commander-js/extra-typings';
 
-import { ConfigOptions, initConnection } from './common';
+import { ConfigOptions, EconetAddress, initConnection, parseEconetAddress } from './common';
 import { PKG_VERSION } from './version';
-import { getLocalStationNum, getServerStationNum } from './config';
+import { getLocalStationNum, getServerNetworkNum, getServerStationNum } from './config';
 import { commandIAm } from './command/iAm';
 import { commandSetFileserver } from './command/setFileserver';
 import { commandGetStatus } from './command/getStatus';
@@ -26,6 +26,10 @@ import { commandNewUser } from './command/newUser';
 import { commandRemUser } from './command/remUser';
 import { commandPass } from './command/pass';
 import { commandPriv } from './command/priv';
+import { commandInteractive } from './command/interactive';
+import { commandFslist } from './command/fslist';
+import { commandTalk } from './command/talk';
+import { readHiddenPassword } from './util/readPassword';
 
 type CliOptions = {
   debug?: true | undefined;
@@ -37,31 +41,42 @@ type CliOptions = {
 const program = new Command()
   .name('ecoclient')
   .description('Econet fileserver client')
-  .version(PKG_VERSION)
-  .option('-d, --debug', 'enable debug output')
-  .option('-n, --devicename <string>', 'specify device name/path')
-  .option('-s, --station <number>', 'specify local Econet station number')
-  .option('-fs, --fileserver <number>', 'specify fileserver station number');
+  .version(PKG_VERSION, '-V, --version', 'Output the version number')
+  .helpOption('-h, --help', 'Display help for command')
+  .option('-d, --debug', 'Enable debug output')
+  .option('-n, --devicename <string>', 'Specify device name/path')
+  .option('-s, --station <number>', 'Specify local Econet station number')
+  .option('-fs, --fileserver <address>', 'Specify fileserver address (e.g. 254 or 1.254)')
+  .option('-i, --interactive', 'Start an interactive shell session with the fileserver')
+  .addHelpText('after', ' ')
+  .action(async () => {
+    if (program.opts().interactive) {
+      const config = await resolveConfig(program.opts());
+      await connectionWrapper(commandInteractive, config, config.serverStation);
+    } else {
+      program.help();
+    }
+  });
 
 program
   .command('set-fs')
-  .description('set fileserver')
-  .argument('<station>', 'station number')
+  .description('Set fileserver')
+  .argument('[net.]<station>', 'Station number')
   .action(async station => {
     await errorHandlingWrapper(commandSetFileserver, station);
   });
 
 program
   .command('set-station')
-  .description('set Econet station')
-  .argument('<station>', 'station number')
+  .description('Set Econet station')
+  .argument('<station>', 'Station number')
   .action(async station => {
     await errorHandlingWrapper(commandSetStation, station);
   });
 
 program
   .command('status')
-  .description('display status info for ecoclient and board')
+  .description('Display status info for ecoclient and board')
   .action(async () => {
     const config = await resolveConfig(program.opts());
     await errorHandlingWrapper(commandGetStatus, config);
@@ -69,35 +84,36 @@ program
 
 program
   .command('set-metadata')
-  .description('set metadata storage mechanism (inf|filename|none)')
-  .argument('<type>', '(inf|filename|none)')
+  .description('Set metadata storage mechanism')
+  .argument('<type>', 'Storage type (inf|filename|none)')
   .action(async metadataType => {
     await errorHandlingWrapper(commandSetMetadata, metadataType);
   });
 
 program
   .command('i-am')
-  .description('login to fileserver like a "*I AM" command')
-  .argument('<username>', 'username')
-  .argument('[password]', 'password')
+  .description('Logon to fileserver like a "*I AM" command')
+  .argument('<username>', 'Username')
+  .argument('[password]', 'Password (use ":" to be prompted securely)')
   .action(async (username, password) => {
     const config = await resolveConfig(program.opts());
+    const actualPassword = password === ':' ? await readHiddenPassword('Password: ') : (password || '');
     await connectionWrapper(
       commandIAm,
       config,
       config.serverStation,
       username,
-      password || '',
+      actualPassword,
     );
   });
 
 program
   .command('notify')
   .description(
-    'send notification message to a station like a "*NOTIFY" command',
+    'Send notification message to a station like a "*NOTIFY" command',
   )
-  .argument('<station>', 'station number')
-  .argument('<message>', 'message')
+  .argument('[net.]<station>', 'Station number')
+  .argument('<message>', 'Message')
   .action(async (station, message) => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandNotify, config, station, message);
@@ -105,8 +121,8 @@ program
 
 program
   .command('dir')
-  .description('change current directory')
-  .argument('[dir]', 'directory path', '')
+  .description('Change current directory')
+  .argument('[dir]', 'Directory path', '')
   .action(async dirPath => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandDir, config, config.serverStation, dirPath);
@@ -114,15 +130,76 @@ program
 
 program
   .command('monitor')
-  .description('listen for network traffic like a "*NETMON" command')
+  .description('Listen for network traffic like a "*NETMON" command')
   .action(async () => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandMonitor, config);
   });
 
 program
+  .command('fslist')
+  .description('List file servers on the network')
+  .action(async () => {
+    const config = await resolveConfig(program.opts());
+    await connectionWrapper(commandFslist, config);
+  });
+
+program
+  .command('talk')
+  .description('Join the Econet Network Conferencer (Talk)')
+  .argument('[name]', 'Your display name (max 12 characters)')
+  .action(async (nameArg, _cmdOpts) => {
+    const cliOptions = program.opts();
+    const stationOption = cliOptions.station;
+    const localStation =
+      typeof stationOption === 'string' ? parseInt(stationOption) : await getLocalStationNum();
+    if (typeof localStation === 'undefined') {
+      console.error(
+        'You must specify an econet station number using --station or set-station command',
+      );
+      process.exit(1);
+    }
+
+    let name = (nameArg ?? '').slice(0, 12).trim();
+    if (!name) {
+      const { createInterface } = await import('readline');
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      name = await new Promise<string>(res =>
+        rl.question('What is your name? ', answer => {
+          rl.close();
+          res(answer.slice(0, 12).trim());
+        }),
+      );
+    }
+    if (!name) {
+      console.error('Name is required.');
+      process.exit(1);
+    }
+
+    const deviceName =
+      typeof cliOptions.devicename === 'string' ? cliOptions.devicename : undefined;
+    const debugEnabled = cliOptions.debug === true;
+    await initConnection(deviceName, localStation, debugEnabled);
+    driver.setDebugEnabled(debugEnabled);
+    try {
+      await errorHandlingWrapper(commandTalk, name, localStation, debugEnabled);
+    } finally {
+      try {
+        await driver.setMode('STOP');
+      } catch {
+        // ignore
+      }
+      await driver.close();
+      // Readline's close() internally calls stdin.resume(), which leaves stdin
+      // as a referenced handle that would keep the process alive. Unref it here,
+      // after all driver cleanup is done, so the process can exit cleanly.
+      process.stdin.unref();
+    }
+  });
+
+program
   .command('bye')
-  .description('logout of fileserver like a "*BYE" command')
+  .description('Logout of fileserver like a "*BYE" command')
   .action(async () => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandBye, config, config.serverStation);
@@ -130,13 +207,13 @@ program
 
 program
   .command('delete')
-  .description('delete file(s) from fileserver')
+  .description('Delete file(s) from fileserver')
   .argument(
     '<pathPattern>',
-    'path for file(s)/dir(s) to get (* matches multiple chars, ? matches single char)',
+    'Path for file(s)/dir(s) to delete (* matches multiple chars, ? matches single char)',
   )
-  .option('-r, --recurse', 'recurse subdirectories')
-  .option('-f, --force', 'force deletion without prompting')
+  .option('-r, --recurse', 'Recurse subdirectories')
+  .option('-f, --force', 'Force deletion without prompting')
   .action(async (pathPattern, commandOpts) => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -151,13 +228,13 @@ program
 
 program
   .command('get')
-  .description('get file(s)/dir(s) from fileserver using "LOAD" command')
+  .description('Get file(s)/dir(s) from fileserver using "LOAD" command')
   .argument(
     '<pathPattern>',
-    'path for file(s)/dir(s) to get (* matches multiple chars, ? matches single char)',
+    'Path for file(s)/dir(s) to get (* matches multiple chars, ? matches single char)',
   )
-  .option('-r, --recurse', 'recurse subdirectories')
-  .option('-f, --force', 'force overwrite of existing files')
+  .option('-r, --recurse', 'Recurse subdirectories')
+  .option('-f, --force', 'Force overwrite of existing files')
   .action(async (pathPattern, commandOpts) => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -172,13 +249,13 @@ program
 
 program
   .command('put')
-  .description('put file(s)/dir(s) to fileserver using "SAVE" command')
+  .description('Put file(s)/dir(s) to fileserver using "SAVE" command')
   .argument(
     '<pathPattern>',
-    'path for file(s)/dir(s) to get (* matches multiple chars, ? matches single char)',
+    'Path for file(s)/dir(s) to put (* matches multiple chars, ? matches single char)',
   )
-  .option('-r, --recurse', 'recurse subdirectories')
-  .option('-f, --force', 'force overwrite of existing files')
+  .option('-r, --recurse', 'Recurse subdirectories')
+  .option('-f, --force', 'Force overwrite of existing files')
   .action(async (pathPattern, commandOpts) => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -193,8 +270,8 @@ program
 
 program
   .command('load')
-  .description('load basic file and detokenise (needs basictool installed)')
-  .argument('<filename>', 'filename')
+  .description('Load basic file and detokenise (needs basictool installed)')
+  .argument('<filename>', 'Filename')
   .action(async filename => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -207,11 +284,11 @@ program
 
 program
   .command('save')
-  .description('save basic file after detokenising (needs basictool installed)')
-  .argument('<localPath>', 'path to file on local filesystem')
+  .description('Save basic file after detokenising (needs basictool installed)')
+  .argument('<localPath>', 'Path to file on local filesystem')
   .argument(
     '[destPath]',
-    'path to file on fileserver (defaults to filename part of localPath)',
+    'Path to file on fileserver (defaults to filename part of localPath)',
   )
   .action(async (localPath, destPath) => {
     const config = await resolveConfig(program.opts());
@@ -226,8 +303,8 @@ program
 
 program
   .command('cat')
-  .description('get catalogue of directory from fileserver')
-  .argument('[dirPath]', 'directory path', '')
+  .description('Get catalogue of directory from fileserver')
+  .argument('[dirPath]', 'Directory path', '')
   .action(async dirPath => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandCat, config, config.serverStation, dirPath);
@@ -235,8 +312,8 @@ program
 
 program
   .command('cdir')
-  .description('create directory on fileserver')
-  .argument('<dirPath>', 'directory path')
+  .description('Create directory on fileserver')
+  .argument('<dirPath>', 'Directory path')
   .action(async dirPath => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(commandCdir, config, config.serverStation, dirPath);
@@ -244,9 +321,9 @@ program
 
 program
   .command('access')
-  .description('set access on fileserver')
-  .argument('<path>', 'file path')
-  .argument('<accessString>', 'access string')
+  .description('Set access on fileserver')
+  .argument('<path>', 'File path')
+  .argument('<accessString>', 'Access string')
   .action(async (remotePath, accessString) => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -260,8 +337,8 @@ program
 
 program
   .command('newuser')
-  .description('create a new user account on fileserver')
-  .argument('<username>', 'username')
+  .description('Create a new user account on fileserver')
+  .argument('<username>', 'Username')
   .action(async username => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -274,8 +351,8 @@ program
 
 program
   .command('remuser')
-  .description('remove a user account from fileserver')
-  .argument('<username>', 'username')
+  .description('Remove a user account from fileserver')
+  .argument('<username>', 'Username')
   .action(async username => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -288,9 +365,9 @@ program
 
 program
   .command('pass')
-  .description('change password for current user')
-  .argument('<oldPassword>', 'old password')
-  .argument('<newPassword>', 'new password')
+  .description('Change password for current user')
+  .argument('<oldPassword>', 'Old password')
+  .argument('<newPassword>', 'New password')
   .action(async (oldPassword, newPassword) => {
     const config = await resolveConfig(program.opts());
     await connectionWrapper(
@@ -304,11 +381,11 @@ program
 
 program
   .command('priv')
-  .description('assign privilege level to user')
-  .argument('<username>', 'username')
+  .description('Assign privilege level to user')
+  .argument('<username>', 'Username')
   .argument(
     '[privilegeChar]',
-    '"S" == System, "N" (or ommit) == Normal, others are system/level-dependent',
+    '"S" == System, "N" (or omit) == Normal, others are system/level-dependent',
   )
   .action(async (username, privilegeChar) => {
     const config = await resolveConfig(program.opts());
@@ -321,8 +398,8 @@ program
     );
   });
 
-const main = () => {
-  program.parse(process.argv);
+const main = async () => {
+  await program.parseAsync(process.argv);
 };
 
 const resolveConfig = async (cliOptions: CliOptions) => {
@@ -332,10 +409,10 @@ const resolveConfig = async (cliOptions: CliOptions) => {
       : undefined;
 
   const serverStationOption = cliOptions.fileserver;
-  const serverStation =
+  const serverStation: EconetAddress =
     typeof serverStationOption === 'string'
-      ? parseInt(serverStationOption)
-      : await getServerStationNum();
+      ? parseEconetAddress(serverStationOption)
+      : { network: await getServerNetworkNum(), station: await getServerStationNum() };
 
   const stationOption = cliOptions.station;
   const localStation =

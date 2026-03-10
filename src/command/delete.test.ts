@@ -46,9 +46,9 @@ describe('commandDelete', () => {
     });
     promptDeleteMock.mockResolvedValue(true);
 
-    await commandDelete(254, 'MYFILE', false, false);
+    await commandDelete({ network: 0, station: 254 }, 'MYFILE', false, false);
 
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYFILE', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYFILE', {
       userRoot: 1,
       current: 2,
       library: 3,
@@ -63,7 +63,7 @@ describe('commandDelete', () => {
     });
     promptDeleteMock.mockResolvedValue(true);
 
-    await expect(commandDelete(254, 'MYFILE', false, false)).rejects.toThrow(
+    await expect(commandDelete({ network: 0, station: 254 }, 'MYFILE', false, false)).rejects.toThrow(
       'File not found: MYFILE',
     );
   });
@@ -87,14 +87,14 @@ describe('commandDelete', () => {
       },
     ]);
 
-    await commandDelete(254, 'MYDIR', true, false);
+    await commandDelete({ network: 0, station: 254 }, 'MYDIR', true, false);
 
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYDIR.MYFILE', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYDIR.MYFILE', {
       userRoot: 1,
       current: 2,
       library: 3,
     });
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYDIR', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYDIR', {
       userRoot: 1,
       current: 2,
       library: 3,
@@ -131,21 +131,21 @@ describe('commandDelete', () => {
       },
     ]);
 
-    await commandDelete(254, 'MYDIR', true, false);
+    await commandDelete({ network: 0, station: 254 }, 'MYDIR', true, false);
 
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYDIR.SUBDIR.SOMEFILE', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYDIR.SUBDIR.SOMEFILE', {
       userRoot: 1,
       current: 2,
       library: 3,
     });
 
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYDIR.SUBDIR', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYDIR.SUBDIR', {
       userRoot: 1,
       current: 2,
       library: 3,
     });
 
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYDIR', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYDIR', {
       userRoot: 1,
       current: 2,
       library: 3,
@@ -185,19 +185,19 @@ describe('commandDelete', () => {
       },
     ]);
 
-    await commandDelete(254, 'MY*', true, false);
+    await commandDelete({ network: 0, station: 254 }, 'MY*', true, false);
 
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYFILE', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYFILE', {
       userRoot: 1,
       current: 2,
       library: 3,
     });
-    expect(deleteFileMock).toHaveBeenCalledWith(254, 'MYFILE2', {
+    expect(deleteFileMock).toHaveBeenCalledWith({ network: 0, station: 254 }, 'MYFILE2', {
       userRoot: 1,
       current: 2,
       library: 3,
     });
-    expect(deleteFileMock).not.toHaveBeenCalledWith(254, 'NOMATCH', {
+    expect(deleteFileMock).not.toHaveBeenCalledWith({ network: 0, station: 254 }, 'NOMATCH', {
       userRoot: 1,
       current: 2,
       library: 3,

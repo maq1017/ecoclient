@@ -1,8 +1,9 @@
+import { EconetAddress } from '../common';
 import { getHandles } from '../config';
 import { examineDir } from '../protocol/examine';
 import { readDirAccessObjectInfo } from '../protocol/objectInfo';
 
-export const commandCat = async (serverStation: number, dirPath: string) => {
+export const commandCat = async (serverStation: EconetAddress, dirPath: string) => {
   const dirInfo = await readDirAccessObjectInfo(
     serverStation,
     dirPath,

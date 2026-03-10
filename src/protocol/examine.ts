@@ -3,6 +3,7 @@ import {
   fsControlByte,
   fsPort,
   DirectoryHandles,
+  EconetAddress,
   standardTxMessage,
   stripCRs,
   waitForReceiveTxEvent,
@@ -23,7 +24,7 @@ export type FileInfo = {
 };
 
 export const examineDir = async (
-  serverStation: number,
+  serverStation: EconetAddress,
   dirPath: string,
   handles: DirectoryHandles,
 ) => {
@@ -61,8 +62,8 @@ export const examineDir = async (
       );
 
       const txResult = await driver.transmit(
-        serverStation,
-        0,
+        serverStation.station,
+        serverStation.network,
         fsControlByte,
         fsPort,
         msg,
@@ -70,7 +71,7 @@ export const examineDir = async (
 
       if (!txResult.success) {
         throw new Error(
-          `Failed to send examine command to station ${serverStation}`,
+          `Failed to send examine command to station ${serverStation.network}.${serverStation.station}`,
         );
       }
 
@@ -83,7 +84,7 @@ export const examineDir = async (
 
       if (serverReply.data.length < 2) {
         throw new Error(
-          `Malformed response from station ${serverStation}: success but not enough data`,
+          `Malformed response from station ${serverStation.network}.${serverStation.station}: success but not enough data`,
         );
       }
 

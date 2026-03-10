@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 
+import { EconetAddress } from '../common';
 import { getHandles } from '../config';
 import { load } from '../protocol/load';
 import { spawnSync } from 'child_process';
 
-export const commandLoad = async (serverStation: number, filename: string) => {
+export const commandLoad = async (serverStation: EconetAddress, filename: string) => {
   const result = await load(serverStation, filename, await getHandles());
   const tempFile = `${result.actualFilename}.tmp`;
   fs.writeFileSync(tempFile, result.data);
