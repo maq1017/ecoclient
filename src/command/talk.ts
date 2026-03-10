@@ -137,13 +137,14 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
     let closing = false;
     let currentPoll: Promise<void> = Promise.resolve();
     let pollInterval: ReturnType<typeof setInterval>;
+    let handleKey: ((key: string) => void) | undefined;
 
     const cleanup = () => {
       closing = true;
       clearInterval(pollInterval);
       if (process.stdin.isTTY) process.stdin.setRawMode(false);
       process.stdin.pause();
-      process.stdin.removeAllListeners('data');
+      if (handleKey) process.stdin.removeListener('data', handleKey);
       process.stdout.removeAllListeners('resize');
       restoreTerminal();
       void currentPoll.then(() => {
@@ -528,7 +529,7 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
     process.stdin.resume();
     process.stdin.setEncoding('utf8');
 
-    process.stdin.on('data', async (key: string) => {
+    handleKey = async (key: string) => {
       if (closing) return;
 
       if (key === '\r' || key === '\n') {
@@ -567,7 +568,8 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
         cursorPos++;
         redrawInput();
       }
-    });
+    };
+    process.stdin.on('data', handleKey);
 
     process.stdout.on('resize', () => {
       setupTerminal();
