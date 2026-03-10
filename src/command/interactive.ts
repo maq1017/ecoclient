@@ -29,7 +29,7 @@ import {
 
 const HELP = `
 Commands:
-  i-am [net].[stn] <user> [pass]  Login to fileserver (use ":" as pass to prompt securely)
+  i-am [net].[stn] <user> [pass]     Logon to fileserver (":" as pass to prompt)
   bye                                Logout from fileserver
   cat [dir]                          List directory contents
   dir [path]                         Change current directory

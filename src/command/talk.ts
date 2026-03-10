@@ -29,8 +29,11 @@ type TalkUser = {
 
 const HELP = `Commands (prefix with *):
   *A <[net.]stn>  Add a station to the default list
+  *B [num]        Rebroadcast enquiry (default: 30 times)
   *C <num>        Change channel number
   *H              This help
+  *I <[net.]stn>  Ignore a station (clear with *I 0)
+  *O <[net.]stn>  Listen only to a station (clear with *O 0)
   *Q              Quit
   *R <index>      Remove user from default list (use *U to see indices)
   *U              List users on default
@@ -44,6 +47,8 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
   let channel = TALK_CHANNEL_DEFAULT;
   let pingCount = MAX_PING_COUNT;
   let lastPingMs = 0;
+  let ignoreStation: { station: number; network: number } | null = null; // *I
+  let onlyStation: { station: number; network: number } | null = null;   // *O
 
   const findUser = (station: number, network: number) =>
     users.findIndex(u => u.station === station && u.network === network);
@@ -65,6 +70,19 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
 
   const formatStation = (station: number, network: number) =>
     network > 0 ? `${network}.${station}` : `${station}`;
+
+  const parseStationArg = (arg: string): { station: number; network: number } | null => {
+    const parts = arg.split('.');
+    let station: number, network: number;
+    if (parts.length === 2) {
+      network = parseInt(parts[0]);
+      station = parseInt(parts[1]);
+    } else {
+      network = 0;
+      station = parseInt(arg);
+    }
+    return (!isNaN(station) && station > 0) ? { station, network } : null;
+  };
 
   // --- Sticky-input terminal UI ---
   // The scroll region covers all rows except the last.
@@ -162,6 +180,14 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
             break;
           }
 
+          case 'B': {
+            const n = parseInt(arg);
+            pingCount = (!isNaN(n) && n > 0) ? n : 30;
+            lastPingMs = Date.now() - PING_INTERVAL_MS;
+            displayMessage(`Rebroadcasting (${pingCount} times)...`);
+            break;
+          }
+
           case 'C': {
             const ch = parseInt(arg);
             if (!isNaN(ch) && ch > 0) {
@@ -178,6 +204,34 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
           case 'H':
             for (const line of HELP.split('\n')) displayMessage(line);
             break;
+
+          case 'I': {
+            const stn = parseStationArg(arg);
+            if (arg === '0' || arg === '') {
+              ignoreStation = null;
+              displayMessage('Ignore filter cleared.');
+            } else if (stn) {
+              ignoreStation = stn;
+              displayMessage(`Ignoring station ${formatStation(stn.station, stn.network)}.`);
+            } else {
+              displayMessage('Usage: *I <[net.]station>  (clear with *I 0)');
+            }
+            break;
+          }
+
+          case 'O': {
+            const stn = parseStationArg(arg);
+            if (arg === '0' || arg === '') {
+              onlyStation = null;
+              displayMessage('Only-listen filter cleared.');
+            } else if (stn) {
+              onlyStation = stn;
+              displayMessage(`Listening only to station ${formatStation(stn.station, stn.network)}.`);
+            } else {
+              displayMessage('Usage: *O <[net.]station>  (clear with *O 0)');
+            }
+            break;
+          }
 
           case 'Q':
             void sendToAll('>', 'Logging off');
@@ -417,6 +471,20 @@ export const commandTalk = async (myName: string, localStation: number, debug = 
           if (parsed) {
             const { flag, senderName, message } = parsed;
             if (senderName) addUser(srcStation, srcNetwork, senderName);
+
+            // *I — ignore this station
+            if (ignoreStation && ignoreStation.station === srcStation && ignoreStation.network === srcNetwork) {
+              try {
+                await sendTalkMessage(srcStation, srcNetwork, '-', myName, 'Not listening', channel);
+              } catch { /* ignore */ }
+              return;
+            }
+
+            // *O — only listen to one station
+            if (onlyStation && !(onlyStation.station === srcStation && onlyStation.network === srcNetwork)) {
+              return;
+            }
+
             const prefix = senderName ? `${senderName}${flag} ` : '';
             displayMessage(`${prefix}${message}`);
           }
